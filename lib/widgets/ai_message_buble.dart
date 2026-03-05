@@ -8,8 +8,6 @@ class AiMessageBubble extends StatelessWidget {
   final VoidCallback? onLike;
   final VoidCallback? onDislike;
   final bool isLoading;
-  final String? reasoningText;
-  final bool isReasoningStreaming;
 
   const AiMessageBubble({
     super.key,
@@ -18,8 +16,6 @@ class AiMessageBubble extends StatelessWidget {
     this.onLike,
     this.onDislike,
     this.isLoading = false,
-    this.reasoningText,
-    this.isReasoningStreaming = false,
   });
 
   @override
@@ -27,14 +23,6 @@ class AiMessageBubble extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if ((reasoningText ?? '').trim().isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _ReasoningPanel(
-              reasoningText: reasoningText!.trim(),
-              isStreaming: isReasoningStreaming,
-            ),
-          ),
         SmoothMarkdown(
           selectable: true,
           data: text,
@@ -87,83 +75,6 @@ class AiMessageBubble extends StatelessWidget {
                 ],
               ),
       ],
-    );
-  }
-}
-
-class _ReasoningPanel extends StatefulWidget {
-  final String reasoningText;
-  final bool isStreaming;
-
-  const _ReasoningPanel({
-    required this.reasoningText,
-    required this.isStreaming,
-  });
-
-  @override
-  State<_ReasoningPanel> createState() => _ReasoningPanelState();
-}
-
-class _ReasoningPanelState extends State<_ReasoningPanel> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withOpacity(0.55),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.6),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.psychology_alt_outlined,
-                    size: 16,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    widget.isStreaming
-                        ? 'Reasoning (live)'
-                        : 'Reasoning (saved)',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    _expanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    size: 18,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-              if (_expanded) ...[
-                const SizedBox(height: 8),
-                Text(
-                  widget.reasoningText,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

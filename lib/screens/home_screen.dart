@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:ai_chat_bot/models/chat.dart';
 import 'package:ai_chat_bot/models/message.dart';
@@ -17,6 +18,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -28,14 +31,27 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const Duration _staleAttachmentTtl = Duration(days: 14);
+  static const int _maxUnreferencedAttachments = 80;
+
   // ── Зависимости ────────────────────────────────────────────────────────────
   // Чтобы сменить хранилище — достаточно подменить репозиторий здесь.
   // В крупном проекте это делается через DI (get_it, riverpod, provider и т.д.)
   late final ChatService _chatService;
   var reasoningEnabled = false;
+  String _selectedModelId = OpenRouterClient.defaultModelId;
+
+  OpenRouterModel get _selectedModel {
+    for (final model in OpenRouterClient.models) {
+      if (model.id == _selectedModelId) return model;
+    }
+    return OpenRouterClient.models.first;
+  }
+
   OpenRouterClient get _openRouter => OpenRouterClient(
-    reasoningEnabled,
+    reasoningEnabled && _selectedModel.supportsReasoning,
     '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',
+    model: _selectedModelId,
   );
   final _speechToText = SpeechToText();
   final _flutterTts = FlutterTts();
@@ -57,10 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
   XFile? _attachedFile;
   bool _attachedFileIsImage = false;
   String? _attachedMimeType;
-  String _currentReasoning = '';
-  String _pendingReasoningChunk = '';
-  String? _activeAssistantMessageId;
-  Timer? _reasoningFlushTimer;
+
   final Map<String, String> _reasoningByMessageId = {};
 
   final _scrollController = ScrollController();
@@ -90,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _reasoningFlushTimer?.cancel();
+
     _speechToText.stop();
     _flutterTts.stop();
     _messageController.dispose();
@@ -108,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _activeChatId = _chatService.chats.first.id;
       }
     });
+    unawaited(_cleanupStaleAttachments());
   }
 
   // ── Управление чатами ──────────────────────────────────────────────────────
@@ -391,18 +405,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _voicePending = '';
     _isProcessingVoiceQueue = false;
 
+    final persistedAttachment = await _persistAttachment(attachedFile);
     final history = _chatService.buildApiHistory(activeChatId);
     final userPayload = await _buildUserPayload(
       text,
-      attachedFile,
+      persistedAttachment,
       attachedFileIsImage,
       attachedMimeType,
     );
-    final userMessageText = [
-      if (text.isNotEmpty) text,
-      if (attachedFile != null) '📎 ${attachedFile.name}',
-    ].join('\n\n');
-
+    final userMessageText = text;
     HapticFeedback.lightImpact();
     _messageController.clear();
 
@@ -411,17 +422,24 @@ class _HomeScreenState extends State<HomeScreen> {
       _attachedFileIsImage = false;
       _attachedMimeType = null;
     });
-    _chatService.addUserMessage(activeChatId, userMessageText);
-    final chatWithAssistant = _chatService.addAssistantMessage(activeChatId, '');
+    _chatService.addUserMessage(
+      activeChatId,
+      userMessageText,
+      filePath: persistedAttachment?.path,
+      isImage: attachedFileIsImage,
+    );
+    final chatWithAssistant = _chatService.addAssistantMessage(
+      activeChatId,
+      '',
+    );
     final assistantMessageId = chatWithAssistant.messages.last.id;
     await _chatService.persist();
+    unawaited(_cleanupStaleAttachments());
 
     setState(() {
       _isSending = true;
       _userScrolledUp = false;
-      _currentReasoning = '';
-      _pendingReasoningChunk = '';
-      _activeAssistantMessageId = assistantMessageId;
+
       _reasoningByMessageId.remove(assistantMessageId);
     });
     _scrollToBottom();
@@ -430,9 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final stream = _openRouter.streamChatCompletion([
         ...history,
         userPayload,
-      ], onReasoningChunk: (chunk) {
-        _enqueueReasoningChunk(assistantMessageId, chunk);
-      });
+      ]);
 
       String accumulated = '';
 
@@ -453,72 +469,91 @@ class _HomeScreenState extends State<HomeScreen> {
       _showSnackBar(errorText);
       setState(() {});
     } finally {
-      _flushReasoningBuffer();
       setState(() {
         _isSending = false;
-        _activeAssistantMessageId = null;
       });
       if (!_userScrolledUp) _scrollToBottom();
     }
   }
 
-  void _enqueueReasoningChunk(String messageId, String chunk) {
-    if (chunk.trim().isEmpty) return;
-    _pendingReasoningChunk += chunk;
+  Future<XFile?> _persistAttachment(XFile? attachment) async {
+    if (attachment == null) return null;
 
-    final shouldFlushImmediately = RegExp(r'[.!?\n]\s*$').hasMatch(chunk);
-    if (shouldFlushImmediately) {
-      _flushReasoningBuffer();
-      return;
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final attachmentsDir = Directory(p.join(docsDir.path, 'attachments'));
+      if (!await attachmentsDir.exists()) {
+        await attachmentsDir.create(recursive: true);
+      }
+
+      final ext = _fileExtension(attachment.name);
+      final baseName = p
+          .basenameWithoutExtension(attachment.name)
+          .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final fileName = ext.isEmpty
+          ? '${DateTime.now().microsecondsSinceEpoch}_$baseName'
+          : '${DateTime.now().microsecondsSinceEpoch}_$baseName.$ext';
+      final targetPath = p.join(attachmentsDir.path, fileName);
+      final sourceFile = File(attachment.path);
+
+      if (await sourceFile.exists()) {
+        await sourceFile.copy(targetPath);
+      } else {
+        final bytes = await attachment.readAsBytes();
+        await File(targetPath).writeAsBytes(bytes, flush: true);
+      }
+
+      return XFile(targetPath, mimeType: attachment.mimeType, name: fileName);
+    } catch (_) {
+      return attachment;
     }
+  }
 
-    _reasoningFlushTimer ??= Timer(
-      const Duration(milliseconds: 180),
-      _flushReasoningBuffer,
-    );
-    if (messageId != _activeAssistantMessageId) {
-      _activeAssistantMessageId = messageId;
+  Future<void> _cleanupStaleAttachments() async {
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final attachmentsDir = Directory(p.join(docsDir.path, 'attachments'));
+      if (!await attachmentsDir.exists()) return;
+
+      final referencedPaths = <String>{};
+      for (final chat in _chatService.chats) {
+        for (final message in chat.messages) {
+          final path = message.filePath;
+          if (path == null || path.isEmpty) continue;
+          referencedPaths.add(p.normalize(path));
+        }
+      }
+
+      final now = DateTime.now();
+      final unreferencedFreshFiles = <({File file, DateTime modified})>[];
+
+      await for (final entity in attachmentsDir.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final normalizedPath = p.normalize(entity.path);
+        if (referencedPaths.contains(normalizedPath)) continue;
+
+        final stat = await entity.stat();
+        final isExpired = now.difference(stat.modified) > _staleAttachmentTtl;
+        if (isExpired) {
+          await entity.delete();
+          continue;
+        }
+
+        unreferencedFreshFiles.add((file: entity, modified: stat.modified));
+      }
+
+      if (unreferencedFreshFiles.length <= _maxUnreferencedAttachments) return;
+
+      unreferencedFreshFiles.sort((a, b) => a.modified.compareTo(b.modified));
+
+      final overflow =
+          unreferencedFreshFiles.length - _maxUnreferencedAttachments;
+      for (var i = 0; i < overflow; i++) {
+        await unreferencedFreshFiles[i].file.delete();
+      }
+    } catch (_) {
+      // cleanup is best-effort
     }
-  }
-
-  void _flushReasoningBuffer() {
-    _reasoningFlushTimer?.cancel();
-    _reasoningFlushTimer = null;
-    if (_pendingReasoningChunk.isEmpty || _activeAssistantMessageId == null) {
-      return;
-    }
-
-    final merged = _mergeReasoning(
-      _currentReasoning,
-      _pendingReasoningChunk,
-    );
-    _pendingReasoningChunk = '';
-
-    if (!mounted) return;
-    setState(() {
-      _currentReasoning = merged;
-      _reasoningByMessageId[_activeAssistantMessageId!] = merged;
-    });
-  }
-
-  String _mergeReasoning(String base, String chunk) {
-    if (base.isEmpty) return chunk.trimLeft();
-    if (chunk.isEmpty) return base;
-
-    final needsSpace = !_endsWithWhitespace(base) && !_startsWithPunctuation(chunk);
-    return needsSpace ? '$base $chunk' : '$base$chunk';
-  }
-
-  bool _endsWithWhitespace(String value) {
-    if (value.isEmpty) return true;
-    final last = value.codeUnitAt(value.length - 1);
-    return last == 32 || last == 9 || last == 10 || last == 13;
-  }
-
-  bool _startsWithPunctuation(String value) {
-    if (value.isEmpty) return false;
-    const punctuation = ' \n\t\r.,!?:;)]}';
-    return punctuation.contains(value[0]);
   }
 
   Future<Map<String, dynamic>> _buildUserPayload(
@@ -680,6 +715,55 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openModelSelectorBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (_) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text(
+                  'Select model',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              for (final model in OpenRouterClient.models)
+                ListTile(
+                  leading: Icon(
+                    model.id == _selectedModelId
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                  ),
+                  title: Text(model.name),
+                  subtitle: Text(model.description),
+                  trailing: Wrap(
+                    spacing: 6,
+                    children: [
+                      if (model.supportsVision)
+                        const Icon(Icons.image_outlined, size: 18),
+                      if (model.goodForRoleplay)
+                        const Icon(Icons.auto_stories_outlined, size: 18),
+                      if (model.supportsReasoning)
+                        const Icon(Icons.psychology_outlined, size: 18),
+                    ],
+                  ),
+                  onTap: () {
+                    setState(() => _selectedModelId = model.id);
+                    Navigator.pop(context);
+                    _showSnackBar('Model switched to: ${model.name}');
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _pickAttachment(
     Future<XFile?> Function() picker, {
     bool forceImage = false,
@@ -723,18 +807,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    if (_isLoading) {
-      return Scaffold(
-        body: Center(
-          child: Lottie.asset(
-            'assets/animations/trail_loading.json',
-            width: 150,
-            height: 150,
-          ),
-        ),
-      );
-    }
+    if (_isLoading) return _buildLoadingState();
 
     final messages = _activeMessages;
 
@@ -753,85 +826,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
 
         // ── AppBar ─────────────────────────────────────────────────
-        appBar: AppBar(
-          title: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 18,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  _activeChatId != null
-                      ? (_chatService.findById(_activeChatId!)?.title ??
-                            'AI Chat Bot')
-                      : 'AI Chat Bot',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            if (messages.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: 'Очистить чат',
-                onPressed: () => showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Очистить чат?'),
-                    content: const Text('Все сообщения будут удалены.'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Отмена'),
-                      ),
-                      FilledButton(
-                        onPressed: () {
-                          _clearActiveChat();
-                          Navigator.pop(ctx);
-                        },
-                        child: const Text('Очистить'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            const SizedBox(width: 4),
-          ],
-          elevation: 0,
-          scrolledUnderElevation: 1,
-        ),
+        appBar: _buildAppBar(colorScheme, messages),
 
         // ── FAB: прокрутка вниз ────────────────────────────────────
-        floatingActionButton: AnimatedSlide(
-          offset: _userScrolledUp ? Offset.zero : const Offset(0, 2),
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          child: AnimatedOpacity(
-            opacity: _userScrolledUp ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 200),
-            child: FloatingActionButton.small(
-              heroTag: 'scroll_bottom',
-              onPressed: () async {
-                setState(() => _userScrolledUp = false);
-                _scrollToBottom();
-              },
-              child: const Icon(Icons.keyboard_arrow_down_rounded),
-            ),
-          ),
-        ),
+        floatingActionButton: _buildFABbutton(),
 
         // ── Body ───────────────────────────────────────────────────
         body: Column(
@@ -841,89 +839,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? _buildNoActiveChat()
                   : messages.isEmpty
                   ? _buildEmptyState()
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      itemCount: messages.length + (_isSending ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index == messages.length) {
-                          return Padding(
-                            padding: EdgeInsets.only(top: 4),
-                            child: AiTypingBubble(
-                              reasoningText: _currentReasoning,
-                            ),
-                          );
-                        }
-                        final msg = messages[index];
-                        if (!msg.isUser && msg.content.isEmpty && _isSending) {
-                          return const SizedBox.shrink();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: MessageBubble(
-                            isLoading: _isSending,
-                            reasoningText: _reasoningByMessageId[msg.id],
-                            isReasoningStreaming:
-                                _isSending && _activeAssistantMessageId == msg.id,
-                            onCopyAll: () {
-                              Clipboard.setData(
-                                ClipboardData(text: msg.content),
-                              );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Скопировано')),
-                              );
-                            },
-                            onDislike: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Спасибо за отзыв!'),
-                                ),
-                              );
-                            },
-                            onLike: () =>
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Спасибо за отзыв!'),
-                                  ),
-                                ),
-                            message: msg,
-                          ),
-                        );
-                      },
-                    ),
+                  : _buildMessageList(messages),
             ),
             Container(
               height: 1,
               color: colorScheme.outlineVariant.withOpacity(0.4),
             ),
-            SafeArea(
-              top: false,
-              child: Container(
-                color: colorScheme.surface,
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                child: InputField(
-                  controller: _messageController,
-                  onSend: _sendMessage,
-                  canSend:
-                      _activeChatId != null &&
-                      (_messageController.text.trim().isNotEmpty ||
-                          _attachedFile != null) &&
-                      !_isSending,
-                  onMicTap: _toggleListening,
-                  onSpeakerTap: _toggleVoiceMode,
-                  isListening: _isListening,
-                  isSpeechEnabled: _speechEnabled,
-                  isVoiceModeEnabled: _voiceModeEnabled,
-                  hintText: _isListening ? 'Listening...' : 'Type here...',
-                  onAttachTap: _openBottomSheet,
-                  attachedFileName: _attachedFile?.name,
-                  onRemoveAttachment: _removeAttachment,
-                ),
-              ),
-            ),
+            _buildMessageInput(colorScheme),
           ],
         ),
       ),
@@ -1009,6 +931,186 @@ class _HomeScreenState extends State<HomeScreen> {
               }).toList(),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageInput(dynamic colorScheme) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        color: colorScheme.surface,
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: InputField(
+          controller: _messageController,
+          onSend: _sendMessage,
+          canSend:
+              _activeChatId != null &&
+              (_messageController.text.trim().isNotEmpty ||
+                  _attachedFile != null) &&
+              !_isSending,
+          onMicTap: _toggleListening,
+          onSpeakerTap: _toggleVoiceMode,
+          isListening: _isListening,
+          isSpeechEnabled: _speechEnabled,
+          isVoiceModeEnabled: _voiceModeEnabled,
+          hintText: _isListening ? 'Listening...' : 'Type here...',
+          onAttachTap: _openBottomSheet,
+          attachedFilePath: _attachedFile?.path,
+          onRemoveAttachment: _removeAttachment,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageList(dynamic messages) {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      itemCount: messages.length + (_isSending ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == messages.length) {
+          return Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: AiTypingBuble(),
+          );
+        }
+        final msg = messages[index];
+        if (!msg.isUser && msg.content.isEmpty && _isSending) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: MessageBubble(
+            isLoading: _isSending,
+
+            onCopyAll: () {
+              Clipboard.setData(ClipboardData(text: msg.content));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Скопировано')));
+            },
+            onDislike: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Спасибо за отзыв!')),
+              );
+            },
+            onLike: () => ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Спасибо за отзыв!'))),
+            message: msg,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFABbutton() {
+    return AnimatedSlide(
+      offset: _userScrolledUp ? Offset.zero : const Offset(0, 2),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: _userScrolledUp ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: FloatingActionButton.small(
+          heroTag: 'scroll_bottom',
+          onPressed: () async {
+            setState(() => _userScrolledUp = false);
+            _scrollToBottom();
+          },
+          child: const Icon(Icons.keyboard_arrow_down_rounded),
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(dynamic colorScheme, dynamic messages) {
+    return AppBar(
+      title: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 18,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              _activeChatId != null
+                  ? (_chatService.findById(_activeChatId!)?.title ??
+                        'AI Chat Bot')
+                  : 'AI Chat Bot',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              _selectedModel.name,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.tune_rounded),
+          tooltip: 'Select model',
+          onPressed: _openModelSelectorBottomSheet,
+        ),
+        if (messages.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded),
+            tooltip: 'Clear chat history',
+            onPressed: () => showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Clear chat history?'),
+                content: const Text('All messages will be deleted.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      _clearActiveChat();
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('Clear'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(width: 4),
+      ],
+      elevation: 0,
+      scrolledUnderElevation: 1,
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Scaffold(
+      body: Center(
+        child: Lottie.asset(
+          'assets/animations/trail_loading.json',
+          width: 150,
+          height: 150,
         ),
       ),
     );

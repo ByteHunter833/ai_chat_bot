@@ -38,6 +38,8 @@ class SQLiteChatRepository implements ChatRepository {
                   role: (m['is_user'] as int) == 1
                       ? MessageRole.user
                       : MessageRole.assistant,
+                  filePath: m['file_path'] as String?,
+                  isImage: ((m['is_image'] as int?) ?? 0) == 1,
                 ),
               )
               .toList(),
@@ -70,6 +72,8 @@ class SQLiteChatRepository implements ChatRepository {
             'id': message.id,
             'chat_id': chat.id,
             'content': message.content,
+            'file_path': message.filePath,
+            'is_image': message.isImage ? 1 : 0,
             'is_user': message.isUser ? 1 : 0,
             // Keep deterministic message order inside each chat.
             'created_at': chat.createdAt.millisecondsSinceEpoch + i,

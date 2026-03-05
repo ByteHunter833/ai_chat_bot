@@ -11,41 +11,63 @@ String _generateMessageId() {
 class Message {
   final String id;
   final String content;
+  final String? filePath;
+  final bool isImage;
   final MessageRole role;
 
-  Message({String? id, required this.content, required this.role})
-    : id = (id == null || id.isEmpty) ? _generateMessageId() : id;
+  Message({
+    String? id,
+    required this.content,
+    required this.role,
+    this.filePath,
+    this.isImage = false,
+  }) : id = (id == null || id.isEmpty) ? _generateMessageId() : id;
 
   bool get isUser => role == MessageRole.user;
 
-  /// Десериализация из JSON (fake DB / backend)
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
-      id: json['id'] as String,
-      content: json['content'] as String,
+      id: json['id'],
+      content: json['content'],
       role: json['role'] == 'user' ? MessageRole.user : MessageRole.assistant,
+      filePath: json['filePath'],
+      isImage: json['isImage'] ?? false,
     );
   }
 
-  /// Сериализация в JSON
   Map<String, dynamic> toJson() => {
     'id': id,
     'role': role == MessageRole.user ? 'user' : 'assistant',
     'content': content,
+    'filePath': filePath,
+    'isImage': isImage,
   };
 
-  /// Удобный конструктор для создания сообщения пользователя
-  factory Message.fromUser(String text) =>
-      Message(content: text, role: MessageRole.user);
+  factory Message.fromUser(
+    String text, {
+    String? filePath,
+    bool isImage = false,
+  }) => Message(
+    content: text,
+    role: MessageRole.user,
+    filePath: filePath,
+    isImage: isImage,
+  );
 
-  /// Удобный конструктор для создания сообщения ассистента
   factory Message.fromAssistant(String text) =>
       Message(content: text, role: MessageRole.assistant);
 
-  /// Копирование с изменением полей
-  Message copyWith({String? id, String? content, MessageRole? role}) => Message(
+  Message copyWith({
+    String? id,
+    String? content,
+    String? filePath,
+    bool? isImage,
+    MessageRole? role,
+  }) => Message(
     id: id ?? this.id,
     content: content ?? this.content,
+    filePath: filePath ?? this.filePath,
+    isImage: isImage ?? this.isImage,
     role: role ?? this.role,
   );
 }

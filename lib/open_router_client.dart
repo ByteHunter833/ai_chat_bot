@@ -2,7 +2,48 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+class OpenRouterModel {
+  final String id;
+  final String name;
+  final String description;
+  final bool supportsVision;
+  final bool goodForRoleplay;
+  final bool supportsReasoning;
+
+  const OpenRouterModel({
+    required this.id,
+    required this.name,
+    required this.description,
+    this.supportsVision = false,
+    this.goodForRoleplay = false,
+    this.supportsReasoning = false,
+  });
+}
+
 class OpenRouterClient {
+  static const String defaultModelId = 'qwen/qwen3-vl-235b-a22b-thinking';
+  static const List<OpenRouterModel> models = [
+    OpenRouterModel(
+      id: 'qwen/qwen3-vl-235b-a22b-thinking',
+      name: 'Qwen3 VL Thinking',
+      description: 'Reasoning-heavy model for complex analytical tasks.',
+      supportsVision: true,
+      supportsReasoning: true,
+    ),
+    OpenRouterModel(
+      id: 'nvidia/nemotron-nano-12b-v2-vl:free',
+      name: 'Nemotron Nano VL',
+      description: 'Universal daily model with image support (multimodal).',
+      supportsVision: true,
+    ),
+    OpenRouterModel(
+      id: 'z-ai/glm-4.5-air:free',
+      name: 'GLM 4.5 Air',
+      description: 'Great for creative dialog and role-playing scenarios.',
+      goodForRoleplay: true,
+    ),
+  ];
+
   final String apiKey;
   final String model;
   final bool enableReasoning;
@@ -11,18 +52,14 @@ class OpenRouterClient {
   OpenRouterClient(
     this.enableReasoning,
     this.apiKey, {
-    this.model = 'qwen/qwen3-vl-235b-a22b-thinking',
-    //z-ai/glm-4.5-air:free
-
-    //arcee-ai/trinity-mini:free
-    //cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+    this.model = defaultModelId,
     http.Client? httpClient,
   }) : _httpClient = httpClient ?? http.Client();
 
   Stream<String> streamChatCompletion(
-    List<Map<String, dynamic>> messages,
-    {void Function(String)? onReasoningChunk}
-  ) async* {
+    List<Map<String, dynamic>> messages, {
+    void Function(String)? onReasoningChunk,
+  }) async* {
     final request = http.Request(
       'POST',
       Uri.parse('https://openrouter.ai/api/v1/chat/completions'),

@@ -17,7 +17,12 @@ class AppDatabase {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, fileName);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -34,10 +39,21 @@ class AppDatabase {
         id TEXT PRIMARY KEY,
         chat_id TEXT NOT NULL,
         content TEXT NOT NULL,
+        file_path TEXT,
+        is_image INTEGER NOT NULL DEFAULT 0,
         is_user INTEGER NOT NULL,
         created_at INTEGER NOT NULL,
         FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE messages ADD COLUMN file_path TEXT');
+      await db.execute(
+        'ALTER TABLE messages ADD COLUMN is_image INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 }

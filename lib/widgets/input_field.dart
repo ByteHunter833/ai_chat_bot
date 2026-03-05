@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -11,8 +13,9 @@ class InputField extends StatelessWidget {
   final bool isSpeechEnabled;
   final bool isVoiceModeEnabled;
   final String hintText;
+
   final VoidCallback onAttachTap;
-  final String? attachedFileName;
+  final String? attachedFilePath;
   final VoidCallback? onRemoveAttachment;
 
   const InputField({
@@ -27,15 +30,17 @@ class InputField extends StatelessWidget {
     required this.isVoiceModeEnabled,
     required this.hintText,
     required this.onAttachTap,
-    this.attachedFileName,
+    this.attachedFilePath,
     this.onRemoveAttachment,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+    final fileExists =
+        attachedFilePath != null && File(attachedFilePath!).existsSync();
 
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xffF5F5F5),
         borderRadius: BorderRadius.circular(13),
@@ -44,42 +49,59 @@ class InputField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (attachedFileName != null) ...[
+          /// attachment preview
+          if (fileExists) ...[
             Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xffE0E0E0)),
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    CupertinoIcons.doc,
-                    size: 18,
-                    color: Color(0xff616161),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      attachedFileName!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              child: SizedBox(
+                width: 80,
+                height: 80,
+                child: Stack(
+                  children: [
+                    /// image preview
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(attachedFilePath!),
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: onRemoveAttachment,
-                    icon: const Icon(Icons.close, size: 18),
-                    constraints: const BoxConstraints(),
-                    padding: EdgeInsets.zero,
-                    splashRadius: 18,
-                  ),
-                ],
+
+                    /// remove button
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      child: GestureDetector(
+                        onTap: onRemoveAttachment,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 4),
           ],
+
+          /// text input
           TextField(
             controller: controller,
             minLines: 1,
@@ -90,25 +112,31 @@ class InputField extends StatelessWidget {
             },
             decoration: InputDecoration(
               hintText: hintText,
+
+              /// attach button
               prefixIcon: IconButton(
                 onPressed: onAttachTap,
                 icon: const Icon(CupertinoIcons.paperclip),
               ),
+
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(13),
                 borderSide: BorderSide.none,
               ),
+
+              /// send / mic / speaker
               suffixIcon: canSend
                   ? IconButton(
-                      icon: Icon(
+                      icon: const Icon(
                         CupertinoIcons.paperplane_fill,
-                        color: const Color(0xff2196F3),
+                        color: Color(0xff2196F3),
                       ),
                       onPressed: onSend,
                     )
                   : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        /// mic
                         IconButton(
                           onPressed: isSpeechEnabled ? onMicTap : null,
                           icon: Icon(
@@ -118,7 +146,8 @@ class InputField extends StatelessWidget {
                             color: isListening ? Colors.red : null,
                           ),
                         ),
-                        const SizedBox(width: 8),
+
+                        /// speaker
                         IconButton(
                           onPressed: onSpeakerTap,
                           icon: Icon(
@@ -132,6 +161,7 @@ class InputField extends StatelessWidget {
                         ),
                       ],
                     ),
+
               suffixIconConstraints: const BoxConstraints(minWidth: 88),
             ),
           ),

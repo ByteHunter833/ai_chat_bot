@@ -27,8 +27,16 @@ class ChatService {
 
   /// Добавить сообщение пользователя в указанный чат
   /// Возвращает обновлённый чат
-  Chat addUserMessage(String chatId, String text) {
-    return _addMessage(chatId, Message.fromUser(text));
+  Chat addUserMessage(
+    String chatId,
+    String text, {
+    String? filePath,
+    bool isImage = false,
+  }) {
+    return _addMessage(
+      chatId,
+      Message.fromUser(text, filePath: filePath, isImage: isImage),
+    );
   }
 
   /// Добавить сообщение ассистента в указанный чат
