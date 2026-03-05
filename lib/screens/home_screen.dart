@@ -50,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   OpenRouterClient get _openRouter => OpenRouterClient(
     reasoningEnabled && _selectedModel.supportsReasoning,
-    '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',
+    'your_api_key_here',
     model: _selectedModelId,
   );
   final _speechToText = SpeechToText();
