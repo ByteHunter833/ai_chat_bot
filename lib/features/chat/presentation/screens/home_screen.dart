@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
 import 'package:nova_ai/core/shared_widgets/chat/ai_message_buble.dart';
@@ -8,6 +9,7 @@ import 'package:nova_ai/core/shared_widgets/chat/suggestion_card.dart';
 import 'package:nova_ai/core/shared_widgets/chat/user_message_buble.dart';
 import 'package:nova_ai/features/chat/data/models/message.dart';
 import 'package:nova_ai/features/chat/data/models/suggestions.dart';
+import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,47 +19,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<Suggestion> suggestions = [
-    const Suggestion(
-      text: 'Design a database schema',
-      description: 'for an online merch store',
-    ),
-    const Suggestion(
-      text: 'Explain airplain',
-      description: 'to someone 5 years old',
-    ),
-
-    const Suggestion(
-      text: 'What is the capital of France?',
-      description: 'Learn about the capital city of France.',
-    ),
-  ];
-  final List<Message> messages = [
-    Message(content: 'Hi how are you', role: MessageType.user),
-    Message(
-      content: 'I am fine, How can I help you today?',
-      role: MessageType.assistant,
-    ),
-  ];
   final TextEditingController messageController = TextEditingController();
 
   void handleSuggestionTap(Suggestion suggestion) {
-    messageController.text = suggestion.text;
+    messageController.text = suggestion.text + ' ' + suggestion.description;
   }
 
   bool hasText() {
     return messageController.text.isNotEmpty;
-  }
-
-  void onSend() {
-    if (hasText()) {
-      setState(() {
-        messages.add(
-          Message(content: messageController.text, role: MessageType.user),
-        );
-      });
-      messageController.clear();
-    }
   }
 
   @override
@@ -76,25 +45,44 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final chatCubit = context.read<ChatCubit>();
     return Scaffold(
       backgroundColor: Colors.white,
       drawer: const ChatHistoryDrawer(),
       appBar: _buildAppBar(context),
       body: Column(
         children: [
-          Expanded(
-            child: messages.isEmpty
-                ? _buildEmptyState(context)
-                : _buildMessageList(context, messages),
+          BlocBuilder<ChatCubit, ChatState>(
+            builder: (context, state) {
+              final messages = state.messages;
+              return Expanded(
+                child: messages.isEmpty
+                    ? _buildEmptyState(context)
+                    : _buildMessageList(context, messages),
+              );
+            },
           ),
-          messages.isEmpty
-              ? _buildSuggestions(suggestions, handleSuggestionTap)
-              : const SizedBox(),
+
+          BlocBuilder<ChatCubit, ChatState>(
+            builder: (context, state) {
+              final suggestions = state.suggestions;
+              final messages = state.messages;
+              return messages.isEmpty
+                  ? _buildSuggestions(suggestions, handleSuggestionTap)
+                  : const SizedBox();
+            },
+          ),
+
           const SizedBox(height: 20),
           InputField(
             messageController: messageController,
             hasText: hasText(),
-            onSend: onSend,
+            onSend: () {
+              if (hasText()) {
+                chatCubit.sendMessage(messageController.text);
+                messageController.clear();
+              }
+            },
           ),
           const SizedBox(height: 20),
         ],

@@ -1,12 +1,5 @@
-// import '../../data/models/chat.dart';
+import 'package:nova_ai/features/chat/data/models/message.dart';
 
-// /// Абстрактный интерфейс репозитория.
-// /// Когда появится реальный backend — просто создаём новый класс,
-// /// реализующий этот интерфейс, и меняем одну строку в DI/провайдере.
-// abstract class ChatRepository {
-//   /// Загрузить все чаты
-//   Future<List<Chat>> loadChats();
-
-//   /// Сохранить список чатов (в fake DB — no-op или запись в файл)
-//   Future<void> saveChats(List<Chat> chats);
-// }
+abstract class ChatRepository {
+  Future<Message> sendMessage(String message);
+}
