@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 class InputField extends StatelessWidget {
   final TextEditingController messageController;
   final bool hasText;
+  final VoidCallback? onSend;
   const InputField({
     super.key,
     required this.messageController,
     required this.hasText,
+    this.onSend,
   });
 
   @override
@@ -45,7 +47,7 @@ class InputField extends StatelessWidget {
           ),
 
           IconButton.filled(
-            onPressed: hasText ? () {} : null,
+            onPressed: hasText ? onSend : null,
             icon: const Icon(Icons.arrow_upward),
             disabledColor: Colors.grey[100],
             style: hasText

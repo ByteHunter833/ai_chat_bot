@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
+import 'package:nova_ai/core/shared_widgets/chat/ai_message_buble.dart';
+import 'package:nova_ai/core/shared_widgets/chat/chat_history_drawer.dart';
 import 'package:nova_ai/core/shared_widgets/chat/input_field.dart';
+import 'package:nova_ai/core/shared_widgets/chat/suggestion_card.dart';
+import 'package:nova_ai/core/shared_widgets/chat/user_message_buble.dart';
+import 'package:nova_ai/features/chat/data/models/message.dart';
 import 'package:nova_ai/features/chat/data/models/suggestions.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -12,29 +17,47 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<Suggestions> suggestions = [
-    const Suggestions(
+  final List<Suggestion> suggestions = [
+    const Suggestion(
       text: 'Design a database schema',
       description: 'for an online merch store',
     ),
-    const Suggestions(
+    const Suggestion(
       text: 'Explain airplain',
       description: 'to someone 5 years old',
     ),
 
-    const Suggestions(
+    const Suggestion(
       text: 'What is the capital of France?',
       description: 'Learn about the capital city of France.',
     ),
   ];
+  final List<Message> messages = [
+    Message(content: 'Hi how are you', role: MessageType.user),
+    Message(
+      content: 'I am fine, How can I help you today?',
+      role: MessageType.assistant,
+    ),
+  ];
   final TextEditingController messageController = TextEditingController();
 
-  void handleSuggestionTap(Suggestions suggestion) {
+  void handleSuggestionTap(Suggestion suggestion) {
     messageController.text = suggestion.text;
   }
 
   bool hasText() {
     return messageController.text.isNotEmpty;
+  }
+
+  void onSend() {
+    if (hasText()) {
+      setState(() {
+        messages.add(
+          Message(content: messageController.text, role: MessageType.user),
+        );
+      });
+      messageController.clear();
+    }
   }
 
   @override
@@ -55,14 +78,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      drawer: const Drawer(),
+      drawer: const ChatHistoryDrawer(),
       appBar: _buildAppBar(context),
       body: Column(
         children: [
-          Expanded(child: _buildEmptyState(context)),
-          _buildSuggestions(suggestions, handleSuggestionTap),
+          Expanded(
+            child: messages.isEmpty
+                ? _buildEmptyState(context)
+                : _buildMessageList(context, messages),
+          ),
+          messages.isEmpty
+              ? _buildSuggestions(suggestions, handleSuggestionTap)
+              : const SizedBox(),
           const SizedBox(height: 20),
-          InputField(messageController: messageController, hasText: hasText()),
+          InputField(
+            messageController: messageController,
+            hasText: hasText(),
+            onSend: onSend,
+          ),
           const SizedBox(height: 20),
         ],
       ),
@@ -100,6 +133,7 @@ Widget _buildEmptyState(BuildContext context) {
 
 PreferredSizeWidget _buildAppBar(BuildContext context) {
   return AppBar(
+    backgroundColor: Colors.white,
     leading: Builder(
       builder: (context) {
         return InkWell(
@@ -127,9 +161,9 @@ PreferredSizeWidget _buildAppBar(BuildContext context) {
 }
 
 Widget _buildSuggestions(
-  List<Suggestions> suggestions,
+  List<Suggestion> suggestions,
 
-  void Function(Suggestions) onSuggestionTap,
+  void Function(Suggestion) onSuggestionTap,
 ) {
   return SizedBox(
     height: 80,
@@ -138,37 +172,27 @@ Widget _buildSuggestions(
       itemBuilder: (context, index) {
         return GestureDetector(
           onTap: () => onSuggestionTap(suggestions[index]),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xffF6F6F6),
-              borderRadius: BorderRadius.circular(15),
-            ),
-
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  suggestions[index].text,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                Text(
-                  suggestions[index].description,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
+          child: SuggestionCard(suggestion: suggestions[index]),
         );
       },
       itemCount: suggestions.length,
     ),
+  );
+}
+
+Widget _buildMessageList(BuildContext context, List<Message> messages) {
+  return ListView.builder(
+    itemCount: messages.length,
+    itemBuilder: (context, index) {
+      final message = messages[index];
+      final isUserMessage = message.role == MessageType.user;
+
+      return Align(
+        alignment: isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
+        child: isUserMessage
+            ? UserMessageBubble(message: message)
+            : AiMessageBubble(text: message.content),
+      );
+    },
   );
 }

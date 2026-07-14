@@ -1,90 +1,84 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AiMessageBubble extends StatelessWidget {
   final String text;
-  final VoidCallback? onCopyAll;
-  final VoidCallback? onLike;
-  final VoidCallback? onDislike;
-  final bool isLoading;
 
-  const AiMessageBubble({
-    super.key,
-    required this.text,
-    this.onCopyAll,
-    this.onLike,
-    this.onDislike,
-    this.isLoading = false,
-  });
+  const AiMessageBubble({super.key, required this.text});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SmoothMarkdown(
-          selectable: true,
-          data: text,
-          styleSheet: MarkdownStyleSheet.vscode(),
-          builderRegistry: BuilderRegistry()
-            ..register(
-              'code_block',
-              const EnhancedCodeBlockBuilder(
-                showCopyButton: true,
-                showLanguageTag: true,
-                enableSyntaxHighlighting: true,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SmoothMarkdown(
+            selectable: true,
+            data: text,
+            styleSheet: MarkdownStyleSheet.vscode(),
+            builderRegistry: BuilderRegistry()
+              ..register(
+                'code_block',
+                const EnhancedCodeBlockBuilder(
+                  showCopyButton: true,
+                  showLanguageTag: true,
+                  enableSyntaxHighlighting: true,
+                ),
               ),
-            ),
-          onTapLink: (String url) async {
-            final uri = Uri.parse(url);
+            onTapLink: (String url) async {
+              final uri = Uri.parse(url);
 
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.inAppWebView);
-            } else {
-              debugPrint('Не удалось открыть $url');
-            }
-          },
-        ),
-
-        const SizedBox(height: 6),
-
-        isLoading
-            ? const SizedBox(height: 24, width: 24)
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (onCopyAll != null)
-                    _ActionButton(
-                      icon: Icons.copy_outlined,
-                      tooltip: 'Copy',
-                      onPressed: onCopyAll!,
-                    ),
-                  if (onLike != null)
-                    _ActionButton(
-                      icon: Icons.thumb_up_alt_outlined,
-                      tooltip: 'Good response',
-                      onPressed: onLike!,
-                    ),
-                  if (onDislike != null)
-                    _ActionButton(
-                      icon: Icons.thumb_down_alt_outlined,
-                      tooltip: 'Bad response',
-                      onPressed: onDislike!,
-                    ),
-                ],
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.inAppWebView);
+              } else {
+                debugPrint('Не удалось открыть $url');
+              }
+            },
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              ActionButton(
+                icon: Icons.copy,
+                tooltip: 'Copy',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Copied to clipboard')),
+                  );
+                },
               ),
-      ],
+              ActionButton(
+                icon: Icons.thumb_up_alt_outlined,
+                tooltip: 'Like',
+                onPressed: () {},
+              ),
+              ActionButton(
+                icon: Icons.thumb_down_outlined,
+                tooltip: 'Dislike',
+                onPressed: () {
+                  // Handle dislike action
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+        ],
+      ),
     );
   }
 }
 
-class _ActionButton extends StatelessWidget {
+class ActionButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
 
-  const _ActionButton({
+  const ActionButton({
     required this.icon,
     required this.tooltip,
     required this.onPressed,
