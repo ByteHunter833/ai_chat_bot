@@ -1,7 +1,7 @@
-import 'package:ai_chat_bot/repository/chat_repository.dart';
+import 'package:nova_ai/features/chat/domain/repositories/chat_repository.dart';
 
-import '../models/chat.dart';
-import '../models/message.dart';
+import '../features/chat/data/models/chat.dart';
+import '../features/chat/data/models/message.dart';
 
 class ChatService {
   final ChatRepository _repository;

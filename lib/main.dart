@@ -1,5 +1,5 @@
-import 'package:ai_chat_bot/screens/home_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:nova_ai/features/chat/presentation/screens/home_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -10,10 +10,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       home: HomeScreen(),
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.light(),
     );
   }
 }
