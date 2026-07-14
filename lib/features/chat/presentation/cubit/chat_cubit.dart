@@ -34,7 +34,7 @@ class ChatCubit extends Cubit<ChatState> {
     final newMessage = Message(content: content, role: MessageType.user);
     final updatedMessages = [...state.messages, newMessage];
     emit(state.copyWith(messages: updatedMessages));
-    final response = await chatRepository.sendMessage(content);
+    final response = await chatRepository.sendMessage(updatedMessages);
     final newMessages = [...updatedMessages, response];
     emit(state.copyWith(messages: newMessages));
   }

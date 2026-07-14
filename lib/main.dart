@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) =>
-          ChatCubit(ChatRepositoryImpl(ChatRemoteDataSourceImpl())),
+          ChatCubit(ChatRepositoryImpl(ChatRemoteDataSourceImpl(apiKey: ''))),
       child: const MaterialApp(
         home: HomeScreen(),
         debugShowCheckedModeBanner: false,
