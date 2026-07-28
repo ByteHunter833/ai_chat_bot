@@ -33,9 +33,23 @@ class ChatCubit extends Cubit<ChatState> {
   void sendMessage(String content) async {
     final newMessage = Message(content: content, role: MessageType.user);
     final updatedMessages = [...state.messages, newMessage];
-    emit(state.copyWith(messages: updatedMessages));
-    final response = await chatRepository.sendMessage(updatedMessages);
-    final newMessages = [...updatedMessages, response];
-    emit(state.copyWith(messages: newMessages));
+    emit(state.copyWith(messages: updatedMessages, isLoading: true));
+    try {
+      final response = await chatRepository.sendMessage(updatedMessages);
+      final newMessages = [...updatedMessages, response];
+      emit(state.copyWith(messages: newMessages, isLoading: false));
+    } catch (e) {
+      emit(
+        state.copyWith(
+          messages: updatedMessages,
+          isLoading: false,
+          errorMessage: e.toString(),
+        ),
+      );
+    }
+  }
+
+  void clearChat() {
+    emit(state.copyWith(messages: [], isLoading: false));
   }
 }
