@@ -4,11 +4,14 @@ class InputField extends StatelessWidget {
   final TextEditingController messageController;
   final bool hasText;
   final VoidCallback? onSend;
+  final void Function()? onPressed;
+
   const InputField({
     super.key,
     required this.messageController,
     required this.hasText,
     this.onSend,
+    this.onPressed,
   });
 
   @override
@@ -23,7 +26,7 @@ class InputField extends StatelessWidget {
             icon: Icons.add,
             background: colorScheme.surfaceContainerHigh,
             foreground: colorScheme.onSurfaceVariant,
-            onPressed: () {},
+            onPressed: onPressed,
           ),
           const SizedBox(width: 8),
           Expanded(

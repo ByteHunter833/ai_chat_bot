@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import 'package:nova_ai/core/shared_widgets/chat/ai_message_buble.dart';
 import 'package:nova_ai/core/shared_widgets/chat/ai_typing_buble.dart';
@@ -12,6 +17,24 @@ import 'package:nova_ai/core/theme/theme_cubit.dart';
 import 'package:nova_ai/features/chat/data/models/message.dart';
 import 'package:nova_ai/features/chat/data/models/suggestions.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
+import 'package:nova_ai/service/file_picker_service.dart';
+
+String _guessMimeType(String path) {
+  final ext = path.split('.').last.toLowerCase();
+  switch (ext) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'gif':
+      return 'image/gif';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    default:
+      return 'application/octet-stream';
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +45,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController messageController = TextEditingController();
+  final FilePickerService fileService = FilePickerService();
+  XFile? attachedImage;
 
   void handleSuggestionTap(Suggestion suggestion) {
     messageController.text = suggestion.text + ' ' + suggestion.description;
@@ -43,6 +68,131 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     messageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndAttach(
+    BuildContext sheetContext,
+    Future<XFile?> Function() pick,
+  ) async {
+    Navigator.pop(sheetContext);
+    final file = await pick();
+    if (file == null) return;
+    if (!_guessMimeType(file.path).startsWith('image/')) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only images are supported right now')),
+      );
+      return;
+    }
+    setState(() => attachedImage = file);
+  }
+
+  void openBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ModalItem(
+                icon: CupertinoIcons.photo,
+                text: 'Photos',
+                onTap: () => _pickAndAttach(
+                  sheetContext,
+                  fileService.pickImageFromGallery,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ModalItem(
+                icon: CupertinoIcons.photo_camera,
+                text: 'Camera',
+                onTap: () => _pickAndAttach(
+                  sheetContext,
+                  fileService.pickImageFromCamera,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ModalItem(
+                icon: CupertinoIcons.paperclip,
+                text: 'Files',
+                onTap: () => _pickAndAttach(sheetContext, fileService.pickFile),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendMessage(ChatCubit chatCubit) async {
+    if (!hasText() && attachedImage == null) return;
+    String? imageBase64;
+    String? imageMimeType;
+    final image = attachedImage;
+    if (image != null) {
+      imageBase64 = base64Encode(await image.readAsBytes());
+      imageMimeType = _guessMimeType(image.path);
+    }
+    chatCubit.sendMessage(
+      messageController.text,
+      imageBase64: imageBase64,
+      imageMimeType: imageMimeType,
+    );
+    messageController.clear();
+    setState(() => attachedImage = null);
+  }
+
+  Widget _buildAttachmentPreview(
+    BuildContext context,
+    XFile file,
+    VoidCallback onRemove,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                File(file.path),
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned(
+              top: -8,
+              right: -8,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Icon(
+                    Icons.close,
+                    size: 14,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -69,11 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return Expanded(
                     child: messages.isEmpty
                         ? _buildEmptyState(context)
-                        : _buildMessageList(
-                            context,
-                            messages,
-                            state.isLoading,
-                          ),
+                        : _buildMessageList(context, messages, state.isLoading),
                   );
                 },
               ),
@@ -88,16 +234,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
 
+              if (attachedImage != null)
+                _buildAttachmentPreview(
+                  context,
+                  attachedImage!,
+                  () => setState(() => attachedImage = null),
+                ),
               const SizedBox(height: 12),
               InputField(
                 messageController: messageController,
-                hasText: hasText(),
-                onSend: () {
-                  if (hasText()) {
-                    chatCubit.sendMessage(messageController.text);
-                    messageController.clear();
-                  }
-                },
+                hasText: hasText() || attachedImage != null,
+                onSend: () => _sendMessage(chatCubit),
+                onPressed: () => openBottomSheet(context),
               ),
               const SizedBox(height: 12),
             ],
@@ -157,11 +305,14 @@ PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
   return AppBar(
     leading: Builder(
       builder: (context) {
-        return _AppBarIconButton(
+        return _RoundedIconButton(
           onTap: () => Scaffold.of(context).openDrawer(),
           child: SvgPicture.asset(
             'assets/icons/menu_ic.svg',
-            colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
+            colorFilter: ColorFilter.mode(
+              colorScheme.onSurface,
+              BlendMode.srcIn,
+            ),
           ),
         );
       },
@@ -174,7 +325,7 @@ PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
               themeMode == ThemeMode.dark ||
               (themeMode == ThemeMode.system &&
                   MediaQuery.platformBrightnessOf(context) == Brightness.dark);
-          return _AppBarIconButton(
+          return _RoundedIconButton(
             onTap: context.read<ThemeCubit>().toggle,
             child: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
@@ -184,7 +335,7 @@ PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
           );
         },
       ),
-      _AppBarIconButton(
+      _RoundedIconButton(
         onTap: chatCubit.clearChat,
         child: SvgPicture.asset(
           'assets/icons/new_chat_ic.svg',
@@ -196,11 +347,11 @@ PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
   );
 }
 
-class _AppBarIconButton extends StatelessWidget {
-  final VoidCallback onTap;
+class _RoundedIconButton extends StatelessWidget {
+  final VoidCallback? onTap;
   final Widget child;
 
-  const _AppBarIconButton({required this.onTap, required this.child});
+  const _RoundedIconButton({this.onTap, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -265,4 +416,29 @@ Widget _buildMessageList(
       );
     },
   );
+}
+
+class ModalItem extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final VoidCallback? onTap;
+  const ModalItem({
+    super.key,
+    required this.icon,
+    required this.text,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Row(
+        children: [
+          _RoundedIconButton(child: Icon(icon)),
+          Text(text),
+        ],
+      ),
+    );
+  }
 }

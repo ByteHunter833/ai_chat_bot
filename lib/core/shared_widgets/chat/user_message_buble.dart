@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:nova_ai/features/chat/data/models/message.dart';
 
@@ -11,7 +13,7 @@ class UserMessageBubble extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(8),
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
@@ -24,9 +26,32 @@ class UserMessageBubble extends StatelessWidget {
           bottomRight: Radius.circular(4),
         ),
       ),
-      child: Text(
-        message.content,
-        style: TextStyle(fontSize: 16.0, color: colorScheme.onPrimary),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (message.imageBase64 != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.memory(
+                base64Decode(message.imageBase64!),
+                fit: BoxFit.cover,
+              ),
+            ),
+          if (message.content.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(
+                top: message.imageBase64 != null ? 8 : 0,
+                left: 8,
+                right: 8,
+                bottom: 4,
+              ),
+              child: Text(
+                message.content,
+                style: TextStyle(fontSize: 16.0, color: colorScheme.onPrimary),
+              ),
+            ),
+        ],
       ),
     );
   }

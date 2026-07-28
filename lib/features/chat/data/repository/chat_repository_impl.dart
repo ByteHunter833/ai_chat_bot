@@ -7,7 +7,7 @@ class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl(this.chatRemoteDataSource);
 
   @override
-  Future<Message> sendMessage(List<Message> messages) async {
-    return await chatRemoteDataSource.sendMessage(messages);
+  Stream<String> streamMessage(List<Message> messages) {
+    return chatRemoteDataSource.streamMessage(messages);
   }
 }

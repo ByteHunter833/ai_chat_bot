@@ -30,14 +30,43 @@ class ChatCubit extends Cubit<ChatState> {
         ),
       );
 
-  void sendMessage(String content) async {
-    final newMessage = Message(content: content, role: MessageType.user);
+  void sendMessage(
+    String content, {
+    String? imageBase64,
+    String? imageMimeType,
+  }) async {
+    final newMessage = Message(
+      content: content,
+      role: MessageType.user,
+      imageBase64: imageBase64,
+      imageMimeType: imageMimeType,
+    );
     final updatedMessages = [...state.messages, newMessage];
     emit(state.copyWith(messages: updatedMessages, isLoading: true));
+
+    final buffer = StringBuffer();
     try {
-      final response = await chatRepository.sendMessage(updatedMessages);
-      final newMessages = [...updatedMessages, response];
-      emit(state.copyWith(messages: newMessages, isLoading: false));
+      await for (final chunk in chatRepository.streamMessage(updatedMessages)) {
+        buffer.write(chunk);
+        emit(
+          state.copyWith(
+            messages: [
+              ...updatedMessages,
+              Message(content: buffer.toString(), role: MessageType.assistant),
+            ],
+            isLoading: false,
+          ),
+        );
+      }
+      if (buffer.isEmpty) {
+        emit(
+          state.copyWith(
+            messages: updatedMessages,
+            isLoading: false,
+            errorMessage: 'The model returned an empty response.',
+          ),
+        );
+      }
     } catch (e) {
       emit(
         state.copyWith(
