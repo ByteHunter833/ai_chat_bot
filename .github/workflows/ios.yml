@@ -36,7 +36,11 @@ jobs:
           pod install
 
       - name: Build iOS Simulator
-        run: flutter build ios --simulator
+        run: |
+          flutter build ios \
+            --simulator \
+            --release \
+            --dart-define=OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Upload iOS Simulator App
         uses: actions/upload-artifact@v4
