@@ -39,7 +39,7 @@ jobs:
         run: |
           flutter build ios \
             --simulator \
-            --release \
+            --profile \
             --dart-define=OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Upload iOS Simulator App
