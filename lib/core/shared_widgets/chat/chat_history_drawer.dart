@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nova_ai/features/chat/data/models/chat.dart';
@@ -76,7 +77,7 @@ class _ChatHistoryDrawerState extends State<ChatHistoryDrawer> {
                   fillColor: colorScheme.surfaceContainerHighest,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(25),
                     borderSide: BorderSide.none,
                   ),
                 ),
@@ -93,11 +94,12 @@ class _ChatHistoryDrawerState extends State<ChatHistoryDrawer> {
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 10),
               Expanded(
                 child: BlocBuilder<ChatCubit, ChatState>(
                   builder: (context, state) {
                     final filtered = _filterChats(state.chats);
+                    // Empty State
                     if (filtered.isEmpty) {
                       return Center(
                         child: Text(
@@ -106,19 +108,19 @@ class _ChatHistoryDrawerState extends State<ChatHistoryDrawer> {
                         ),
                       );
                     }
-
+                    // displaying chats
                     return ListView.builder(
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final chat = filtered[index];
                         final isSelected = chat.id == state.currentChatId;
                         return ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(25),
                           child: ListTile(
                             selected: isSelected,
                             selectedTileColor: colorScheme.primaryContainer,
                             leading: Icon(
-                              Icons.chat_bubble_outline,
+                              CupertinoIcons.chat_bubble_2_fill,
                               size: 20,
                               color: isSelected
                                   ? colorScheme.onPrimaryContainer
@@ -135,7 +137,7 @@ class _ChatHistoryDrawerState extends State<ChatHistoryDrawer> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(25),
                             ),
                             onTap: () {
                               context.read<ChatCubit>().selectChat(chat.id);

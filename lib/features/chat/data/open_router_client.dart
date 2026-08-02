@@ -1,24 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-
-class OpenRouterModel {
-  final String id;
-  final String name;
-  final String description;
-  final bool supportsVision;
-  final bool goodForRoleplay;
-  final bool supportsReasoning;
-
-  const OpenRouterModel({
-    required this.id,
-    required this.name,
-    required this.description,
-    this.supportsVision = false,
-    this.goodForRoleplay = false,
-    this.supportsReasoning = false,
-  });
-}
+import 'package:nova_ai/features/chat/data/models/open_router_model.dart';
 
 class OpenRouterClient {
   static const String defaultModelId = 'google/gemma-4-26b-a4b-it:free';

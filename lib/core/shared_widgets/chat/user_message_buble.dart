@@ -12,7 +12,7 @@ class UserMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final image = _buildImage();
+    final image = _buildImage(context);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
       padding: const EdgeInsets.all(8),
@@ -52,17 +52,43 @@ class UserMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget? _buildImage() {
+  Widget? _buildImage(BuildContext context) {
     final imageBase64 = message.imageBase64;
     if (imageBase64 != null) {
-      return Image.memory(base64Decode(imageBase64), fit: BoxFit.cover);
+      return Image.memory(
+        base64Decode(imageBase64),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildMissingAttachment(context),
+      );
     }
 
     final filePath = message.filePath;
     if (message.isImage && filePath != null) {
-      return Image.file(File(filePath), fit: BoxFit.cover);
+      return Image.file(
+        File(filePath),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildMissingAttachment(context),
+      );
+    }
+
+    if (message.isImage) {
+      return _buildMissingAttachment(context);
     }
 
     return null;
+  }
+
+  Widget _buildMissingAttachment(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 220,
+      height: 132,
+      alignment: Alignment.center,
+      color: colorScheme.onPrimary.withValues(alpha: 0.12),
+      child: Icon(
+        Icons.broken_image_outlined,
+        color: colorScheme.onPrimary.withValues(alpha: 0.72),
+      ),
+    );
   }
 }

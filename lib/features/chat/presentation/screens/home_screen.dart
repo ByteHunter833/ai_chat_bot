@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_anchor/flutter_anchor.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,6 +19,8 @@ import 'package:nova_ai/features/chat/data/models/message.dart';
 import 'package:nova_ai/features/chat/data/models/suggestions.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:nova_ai/service/file_picker_service.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 
 String _guessMimeType(String path) {
   final ext = path.split('.').last.toLowerCase();
@@ -33,6 +36,27 @@ String _guessMimeType(String path) {
       return 'image/jpeg';
     default:
       return 'application/octet-stream';
+  }
+}
+
+String _mimeTypeForFile(XFile file) {
+  final mimeType = file.mimeType;
+  if (mimeType != null && mimeType.isNotEmpty) return mimeType;
+  return _guessMimeType(file.path);
+}
+
+String _extensionForMimeType(String mimeType) {
+  switch (mimeType) {
+    case 'image/png':
+      return '.png';
+    case 'image/webp':
+      return '.webp';
+    case 'image/gif':
+      return '.gif';
+    case 'image/jpeg':
+      return '.jpg';
+    default:
+      return '.bin';
   }
 }
 
@@ -84,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.pop(sheetContext);
     final file = await pick();
     if (file == null) return;
-    if (!_guessMimeType(file.path).startsWith('image/')) {
+    if (!_mimeTypeForFile(file).startsWith('image/')) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Only images are supported right now')),
@@ -141,20 +165,65 @@ class _HomeScreenState extends State<HomeScreen> {
     _shouldAutoScroll = true;
     String? imageBase64;
     String? imageMimeType;
+    String? imageFilePath;
     final image = attachedImage;
     if (image != null) {
-      imageBase64 = base64Encode(await image.readAsBytes());
-      imageMimeType = _guessMimeType(image.path);
+      late final List<int> imageBytes;
+      try {
+        imageBytes = await image.readAsBytes();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to read attachment: $e')),
+        );
+        return;
+      }
+
+      imageMimeType = _mimeTypeForFile(image);
+      imageBase64 = base64Encode(imageBytes);
+      imageFilePath = await _saveAttachmentCopy(
+        image,
+        imageBytes,
+        imageMimeType,
+      );
     }
     chatCubit.sendMessage(
       messageController.text,
       imageBase64: imageBase64,
       imageMimeType: imageMimeType,
-      imageFilePath: image?.path,
+      imageFilePath: imageFilePath,
     );
 
     messageController.clear();
     setState(() => attachedImage = null);
+  }
+
+  Future<String> _saveAttachmentCopy(
+    XFile file,
+    List<int> bytes,
+    String mimeType,
+  ) async {
+    try {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final attachmentsDirectory = Directory(
+        path.join(documentsDirectory.path, 'attachments'),
+      );
+      await attachmentsDirectory.create(recursive: true);
+
+      final originalExtension = path.extension(file.path);
+      final extension = originalExtension.isNotEmpty
+          ? originalExtension
+          : _extensionForMimeType(mimeType);
+      final fileName = '${DateTime.now().microsecondsSinceEpoch}$extension'
+          .toLowerCase();
+      final savedFile = File(path.join(attachmentsDirectory.path, fileName));
+
+      await savedFile.writeAsBytes(bytes, flush: true);
+      return savedFile.path;
+    } catch (e) {
+      debugPrint('Failed to persist attachment copy: $e');
+      return file.path;
+    }
   }
 
   Widget _buildAttachmentPreview(
@@ -370,7 +439,18 @@ PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
         );
       },
     ),
-    title: const Text('Nova AI'),
+    title: Anchor(
+      placement: Placement.bottom,
+      overlayBuilder: (context) => _buildModelMenu(context),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Nova AI', style: TextStyle(fontWeight: FontWeight.w600)),
+          SizedBox(width: 4),
+          Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+        ],
+      ),
+    ),
     actions: [
       BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {
@@ -398,6 +478,90 @@ PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
       const SizedBox(width: 8),
     ],
   );
+}
+
+Widget _buildModelMenu(BuildContext context) {
+  final colors = Theme.of(context).colorScheme;
+
+  return Material(
+    elevation: 8,
+    borderRadius: BorderRadius.circular(18),
+    color: colors.surfaceContainer,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 300, maxHeight: 260),
+      child: ListView(
+        padding: const EdgeInsets.all(8),
+        shrinkWrap: true,
+        children: const [
+          _ModelTile(
+            title: 'Nova AI',
+            subtitle: 'Default model',
+            selected: true,
+          ),
+          SizedBox(height: 4),
+          _ModelTile(
+            title: 'Gemini 2.5 Flash',
+            subtitle: 'Fast and lightweight',
+          ),
+          SizedBox(height: 4),
+          _ModelTile(title: 'Gemini 2.5 Pro', subtitle: 'Best reasoning'),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ModelTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool selected;
+
+  const _ModelTile({
+    required this.title,
+    required this.subtitle,
+    this.selected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () {},
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? colors.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected) Icon(Icons.check_rounded, color: colors.primary),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _RoundedIconButton extends StatelessWidget {

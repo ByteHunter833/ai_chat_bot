@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
+import 'package:nova_ai/core/theme/theme_cubit.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AiMessageBubble extends StatelessWidget {
@@ -13,8 +15,16 @@ class AiMessageBubble extends StatelessWidget {
     this.showActions = true,
   });
 
+  void feedback(String feedbackType, BuildContext conn) {
+    ScaffoldMessenger.of(conn).showSnackBar(
+      const SnackBar(content: Text('Thank you for your feedback!')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final themeCubit = context.read<ThemeCubit>();
+    final isDarkMode = themeCubit.state == ThemeMode.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: Column(
@@ -24,7 +34,9 @@ class AiMessageBubble extends StatelessWidget {
           SmoothMarkdown(
             selectable: true,
             data: text,
-            styleSheet: MarkdownStyleSheet.vscode(),
+            styleSheet: MarkdownStyleSheet.vscode(
+              brightness: isDarkMode ? Brightness.dark : Brightness.light,
+            ),
             builderRegistry: BuilderRegistry()
               ..register(
                 'code_block',
@@ -80,12 +92,16 @@ class AiMessageBubble extends StatelessWidget {
                         ActionButton(
                           icon: Icons.thumb_up_alt_outlined,
                           tooltip: 'Like',
-                          onPressed: () {},
+                          onPressed: () {
+                            feedback('Like', context);
+                          },
                         ),
                         ActionButton(
                           icon: Icons.thumb_down_outlined,
                           tooltip: 'Dislike',
-                          onPressed: () {},
+                          onPressed: () {
+                            feedback('Dislike', context);
+                          },
                         ),
                       ],
                     ),
