@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nova_ai/features/chat/data/models/chat.dart';
+import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
 
 class ChatHistoryDrawer extends StatefulWidget {
   const ChatHistoryDrawer({super.key});
@@ -8,13 +11,6 @@ class ChatHistoryDrawer extends StatefulWidget {
 }
 
 class _ChatHistoryDrawerState extends State<ChatHistoryDrawer> {
-  final List<String> chatHistory = [
-    'Chat 1',
-    'Chat 2',
-    'Chat 3',
-    'Chat 4',
-    'Chat 5',
-  ];
   final TextEditingController searchController = TextEditingController();
   String query = '';
 
@@ -35,11 +31,6 @@ class _ChatHistoryDrawerState extends State<ChatHistoryDrawer> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final filtered = query.isEmpty
-        ? chatHistory
-        : chatHistory
-              .where((chat) => chat.toLowerCase().contains(query))
-              .toList();
 
     return Drawer(
       child: SafeArea(
@@ -104,40 +95,72 @@ class _ChatHistoryDrawerState extends State<ChatHistoryDrawer> {
               ),
               const SizedBox(height: 4),
               Expanded(
-                child: filtered.isEmpty
-                    ? Center(
+                child: BlocBuilder<ChatCubit, ChatState>(
+                  builder: (context, state) {
+                    final filtered = _filterChats(state.chats);
+                    if (filtered.isEmpty) {
+                      return Center(
                         child: Text(
                           'No chats found',
                           style: TextStyle(color: colorScheme.onSurfaceVariant),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: ListTile(
-                              leading: Icon(
-                                Icons.chat_bubble_outline,
-                                size: 20,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              title: Text(filtered[index]),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              onTap: () {
-                                Navigator.pop(context);
-                              },
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final chat = filtered[index];
+                        final isSelected = chat.id == state.currentChatId;
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: ListTile(
+                            selected: isSelected,
+                            selectedTileColor: colorScheme.primaryContainer,
+                            leading: Icon(
+                              Icons.chat_bubble_outline,
+                              size: 20,
+                              color: isSelected
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onSurfaceVariant,
                             ),
-                          );
-                        },
-                      ),
+                            title: Text(
+                              chat.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              chat.preview,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            onTap: () {
+                              context.read<ChatCubit>().selectChat(chat.id);
+                              Navigator.pop(context);
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  List<Chat> _filterChats(List<Chat> chats) {
+    if (query.isEmpty) return chats;
+    return chats.where((chat) {
+      final title = chat.title.toLowerCase();
+      final preview = chat.preview.toLowerCase();
+      return title.contains(query) || preview.contains(query);
+    }).toList();
   }
 }

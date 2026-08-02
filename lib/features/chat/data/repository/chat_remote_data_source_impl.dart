@@ -11,7 +11,7 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   @override
   Stream<String> streamMessage(List<Message> messages) {
     return _client.streamChatCompletion(
-      messages.map((message) => message.toJson()).toList(),
+      messages.map((message) => message.toApiJson()).toList(),
     );
   }
 }

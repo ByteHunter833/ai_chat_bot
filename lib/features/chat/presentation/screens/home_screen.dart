@@ -47,26 +47,33 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController messageController = TextEditingController();
   final FilePickerService fileService = FilePickerService();
   XFile? attachedImage;
+  final ScrollController _scrollController = ScrollController();
+  bool _shouldAutoScroll = true;
 
   void handleSuggestionTap(Suggestion suggestion) {
     messageController.text = suggestion.text + ' ' + suggestion.description;
   }
 
-  bool hasText() {
-    return messageController.text.isNotEmpty;
-  }
+  bool get hasText => messageController.text.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ChatCubit>().loadChats();
+    });
     messageController.addListener(() {
       setState(() {});
     });
+    _scrollController.addListener(_handleScroll);
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_handleScroll);
     messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -130,7 +137,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _sendMessage(ChatCubit chatCubit) async {
-    if (!hasText() && attachedImage == null) return;
+    if (!hasText && attachedImage == null) return;
+    _shouldAutoScroll = true;
     String? imageBase64;
     String? imageMimeType;
     final image = attachedImage;
@@ -142,7 +150,9 @@ class _HomeScreenState extends State<HomeScreen> {
       messageController.text,
       imageBase64: imageBase64,
       imageMimeType: imageMimeType,
+      imageFilePath: image?.path,
     );
+
     messageController.clear();
     setState(() => attachedImage = null);
   }
@@ -195,17 +205,54 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final distanceToBottom = position.maxScrollExtent - position.pixels;
+    _shouldAutoScroll = distanceToBottom <= 96;
+  }
+
+  void _queueScrollToBottom({bool animated = true}) {
+    if (!_shouldAutoScroll) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_shouldAutoScroll || !_scrollController.hasClients) {
+        return;
+      }
+      final position = _scrollController.position;
+      final offset = position.maxScrollExtent;
+
+      if (animated) {
+        _scrollController.animateTo(
+          offset,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(offset);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatCubit = context.read<ChatCubit>();
     return BlocListener<ChatCubit, ChatState>(
       listenWhen: (previous, current) =>
-          current.errorMessage != null &&
+          current.messages != previous.messages ||
+          current.isLoading != previous.isLoading ||
+          current.isStreaming != previous.isStreaming ||
           current.errorMessage != previous.errorMessage,
       listener: (context, state) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+        final errorMessage = state.errorMessage;
+        if (errorMessage != null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMessage)));
+        }
+
+        if (state.messages.isNotEmpty || state.isLoading) {
+          _queueScrollToBottom(animated: !state.isStreaming);
+        }
       },
       child: Scaffold(
         drawer: const ChatHistoryDrawer(),
@@ -219,7 +266,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   return Expanded(
                     child: messages.isEmpty
                         ? _buildEmptyState(context)
-                        : _buildMessageList(context, messages, state.isLoading),
+                        : _buildMessageList(
+                            context,
+                            messages,
+                            state.isLoading,
+                            state.isStreaming,
+                            _scrollController,
+                          ),
                   );
                 },
               ),
@@ -243,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 12),
               InputField(
                 messageController: messageController,
-                hasText: hasText() || attachedImage != null,
+                hasText: hasText || attachedImage != null,
                 onSend: () => _sendMessage(chatCubit),
                 onPressed: () => openBottomSheet(context),
               ),
@@ -336,7 +389,7 @@ PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
         },
       ),
       _RoundedIconButton(
-        onTap: chatCubit.clearChat,
+        onTap: chatCubit.startNewChat,
         child: SvgPicture.asset(
           'assets/icons/new_chat_ic.svg',
           colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
@@ -396,23 +449,31 @@ Widget _buildMessageList(
   BuildContext context,
   List<Message> messages,
   bool isLoading,
+  bool isStreaming,
+  ScrollController _scrollController,
 ) {
   final itemCount = messages.length + (isLoading ? 1 : 0);
   return ListView.builder(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
     itemCount: itemCount,
+    controller: _scrollController,
     itemBuilder: (context, index) {
       if (index == messages.length) {
         return const AiTypingBuble();
       }
       final message = messages[index];
       final isUserMessage = message.role == MessageType.user;
+      final isStreamingMessage =
+          isStreaming && index == messages.length - 1 && !isUserMessage;
 
       return Align(
         alignment: isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
         child: isUserMessage
             ? UserMessageBubble(message: message)
-            : AiMessageBubble(text: message.content),
+            : AiMessageBubble(
+                text: message.content,
+                showActions: !isStreamingMessage,
+              ),
       );
     },
   );

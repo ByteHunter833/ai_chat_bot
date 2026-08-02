@@ -5,27 +5,18 @@ import 'package:url_launcher/url_launcher.dart';
 
 class AiMessageBubble extends StatelessWidget {
   final String text;
+  final bool showActions;
 
-  const AiMessageBubble({super.key, required this.text});
+  const AiMessageBubble({
+    super.key,
+    required this.text,
+    this.showActions = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.85,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(4),
-          topRight: Radius.circular(20),
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -53,32 +44,55 @@ class AiMessageBubble extends StatelessWidget {
               }
             },
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              ActionButton(
-                icon: Icons.copy,
-                tooltip: 'Copy',
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: text));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied to clipboard')),
-                  );
-                },
-              ),
-              ActionButton(
-                icon: Icons.thumb_up_alt_outlined,
-                tooltip: 'Like',
-                onPressed: () {},
-              ),
-              ActionButton(
-                icon: Icons.thumb_down_outlined,
-                tooltip: 'Dislike',
-                onPressed: () {
-                  // Handle dislike action
-                },
-              ),
-            ],
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SizeTransition(
+                  sizeFactor: animation,
+                  axisAlignment: -1,
+                  child: child,
+                ),
+              );
+            },
+            child: showActions
+                ? Padding(
+                    key: const ValueKey('ai-message-actions'),
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        ActionButton(
+                          icon: Icons.copy,
+                          tooltip: 'Copy',
+                          onPressed: () async {
+                            await Clipboard.setData(ClipboardData(text: text));
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Copied to clipboard'),
+                              ),
+                            );
+                          },
+                        ),
+                        ActionButton(
+                          icon: Icons.thumb_up_alt_outlined,
+                          tooltip: 'Like',
+                          onPressed: () {},
+                        ),
+                        ActionButton(
+                          icon: Icons.thumb_down_outlined,
+                          tooltip: 'Dislike',
+                          onPressed: () {},
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(
+                    key: ValueKey('ai-message-actions-hidden'),
+                  ),
           ),
         ],
       ),
@@ -109,7 +123,9 @@ class ActionButton extends StatelessWidget {
           child: Icon(
             icon,
             size: 16,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.45),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
           ),
         ),
       ),

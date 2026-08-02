@@ -6,13 +6,16 @@ import 'package:nova_ai/features/chat/data/repository/chat_remote_data_source_im
 import 'package:nova_ai/features/chat/data/repository/chat_repository_impl.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:nova_ai/features/chat/presentation/screens/home_screen.dart';
+import 'package:nova_ai/service/data_base_service.dart';
 
 const openRouterApiKey = String.fromEnvironment(
   'OPENROUTER_API_KEY',
   defaultValue: '',
 );
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppDatabase.instance.database;
   if (openRouterApiKey.isEmpty) {
     debugPrint(
       'Warning: OPENROUTER_API_KEY is not set. Run with '

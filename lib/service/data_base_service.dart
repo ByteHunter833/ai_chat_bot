@@ -20,6 +20,9 @@ class AppDatabase {
     return await openDatabase(
       path,
       version: 2,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -50,10 +53,26 @@ class AppDatabase {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute('ALTER TABLE messages ADD COLUMN file_path TEXT');
-      await db.execute(
-        'ALTER TABLE messages ADD COLUMN is_image INTEGER NOT NULL DEFAULT 0',
+      await _addColumnIfMissing(db, 'messages', 'file_path', 'TEXT');
+      await _addColumnIfMissing(
+        db,
+        'messages',
+        'is_image',
+        'INTEGER NOT NULL DEFAULT 0',
       );
+    }
+  }
+
+  Future<void> _addColumnIfMissing(
+    Database db,
+    String table,
+    String column,
+    String definition,
+  ) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    final hasColumn = columns.any((row) => row['name'] == column);
+    if (!hasColumn) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
     }
   }
 }
