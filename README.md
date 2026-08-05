@@ -1,4 +1,4 @@
-# Nova AI
+   # Nova AI
 
 AI Chat Bot is a sophisticated conversational interface built with Flutter, powered by OpenRouter to provide access to a wide range of advanced AI models. This project features a seamless chat experience with local persistence and context-aware responses.
 
@@ -53,16 +53,16 @@ AI Chat Bot is a sophisticated conversational interface built with Flutter, powe
    flutter run
    ```
 
-## Screenshots
 
-|                         Welcome Screen                         |
-| :------------------------------------------------------------: |
-| ![Welcome Screen](/assets/images/ios_version_welcome_page.png) |
+## 📱 Screenshots
 
-|                   Chat Interface                   |                  Conversation History                  |
-| :------------------------------------------------: | :----------------------------------------------------: |
-|   ![Chat Screen](/assets/images/chat_screen.png)   |   ![Historsy Screen](assets/images/chat_history.png)   |
-| ![Chat Screen](/assets/images/chat_screen_ios.png) | ![Historsy Screen](assets/images/chat_history_ios.png) |
+| Welcome | Chat (Android) | Chat (iOS) |
+| :------: | :------------: | :--------: |
+| <img src="assets/images/ios_version_welcome_page.png" width="220"/> | <img src="assets/images/chat_screen.png" width="220"/> | <img src="assets/images/chat_screen_ios.png" width="220"/> |
+
+| History (Android) | History (iOS) |
+| :---------------: | :-----------: |
+| <img src="assets/images/chat_history.png" width="220"/> | <img src="assets/images/chat_history_ios.png" width="220"/> |
 
 ## Usage
 
