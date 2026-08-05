@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
-import 'package:nova_ai/core/theme/theme_cubit.dart';
-import 'package:nova_ai/core/theme/theme_state.dart';
+import 'package:nova_ai/core/theme/cubit/theme_cubit.dart';
+import 'package:nova_ai/core/theme/cubit/theme_state.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AiMessageBubble extends StatelessWidget {

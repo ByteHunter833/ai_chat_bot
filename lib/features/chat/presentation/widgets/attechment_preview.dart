@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:nova_ai/features/chat/presentation/widgets/image_preview.dart';
 
 class AttechmentPreview extends StatelessWidget {
   final XFile file;
@@ -22,13 +23,26 @@ class AttechmentPreview extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                File(file.path),
-                width: 72,
-                height: 72,
-                fit: BoxFit.cover,
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ImagePreviewPage(imagePath: file.path),
+                  ),
+                );
+              },
+              child: Hero(
+                tag: file.path,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(file.path),
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
             ),
             Positioned(
