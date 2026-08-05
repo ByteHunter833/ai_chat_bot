@@ -3,25 +3,18 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_anchor/flutter_anchor.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:lottie/lottie.dart';
-import 'package:nova_ai/core/shared_widgets/chat/ai_message_buble.dart';
-import 'package:nova_ai/core/shared_widgets/chat/ai_typing_buble.dart';
 import 'package:nova_ai/core/shared_widgets/chat/chat_history_drawer.dart';
 import 'package:nova_ai/core/shared_widgets/chat/input_field.dart';
-import 'package:nova_ai/core/shared_widgets/chat/suggestion_card.dart';
-import 'package:nova_ai/core/shared_widgets/chat/user_message_buble.dart';
-import 'package:nova_ai/core/theme/theme_cubit.dart';
-import 'package:nova_ai/core/theme/theme_state.dart';
-import 'package:nova_ai/features/chat/data/models/message.dart';
-import 'package:nova_ai/features/chat/data/models/open_router_model.dart';
 import 'package:nova_ai/features/chat/data/models/suggestions.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
+import 'package:nova_ai/features/chat/presentation/widgets/attechment_preview.dart';
+import 'package:nova_ai/features/chat/presentation/widgets/chat_app_bar.dart';
+import 'package:nova_ai/features/chat/presentation/widgets/empty_state_widget.dart';
+import 'package:nova_ai/features/chat/presentation/widgets/message_list.dart';
 import 'package:nova_ai/features/chat/presentation/widgets/model_item.dart';
-import 'package:nova_ai/features/chat/presentation/widgets/rounded_icon.dart';
+import 'package:nova_ai/features/chat/presentation/widgets/suggestion_list.dart';
 import 'package:nova_ai/service/file_picker_service.dart';
 import 'package:nova_ai/utils/utils.dart';
 import 'package:path/path.dart' as path;
@@ -193,54 +186,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildAttachmentPreview(
-    BuildContext context,
-    XFile file,
-    VoidCallback onRemove,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                File(file.path),
-                width: 72,
-                height: 72,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Positioned(
-              top: -8,
-              right: -8,
-              child: GestureDetector(
-                onTap: onRemove,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: colorScheme.outlineVariant),
-                  ),
-                  child: Icon(
-                    Icons.close,
-                    size: 14,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _handleScroll() {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
@@ -292,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         drawer: const ChatHistoryDrawer(),
-        appBar: _buildAppBar(context, chatCubit),
+        appBar: ChatAppBar(chatCubit: chatCubit),
         body: SafeArea(
           child: Column(
             children: [
@@ -301,13 +246,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   final messages = state.messages;
                   return Expanded(
                     child: messages.isEmpty
-                        ? _buildEmptyState(context)
-                        : _buildMessageList(
-                            context,
-                            messages,
-                            state.isLoading,
-                            state.isStreaming,
-                            _scrollController,
+                        ? const EmptyStateWidget()
+                        : MessageList(
+                            messages: messages,
+                            isLoading: state.isLoading,
+                            isStreaming: state.isStreaming,
+                            scrollController: _scrollController,
                           ),
                   );
                 },
@@ -318,16 +262,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   final suggestions = state.suggestions;
                   final messages = state.messages;
                   return messages.isEmpty
-                      ? _buildSuggestions(suggestions, handleSuggestionTap)
+                      ? SuggestionList(
+                          onSuggestionTap: handleSuggestionTap,
+                          suggestions: suggestions,
+                        )
                       : const SizedBox();
                 },
               ),
 
               if (attachedImage != null)
-                _buildAttachmentPreview(
-                  context,
-                  attachedImage!,
-                  () => setState(() => attachedImage = null),
+                AttechmentPreview(
+                  file: attachedImage!,
+                  onRemove: () => setState(() => attachedImage = null),
                 ),
               const SizedBox(height: 12),
               InputField(
@@ -341,220 +287,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    colorScheme.primaryContainer,
-                    colorScheme.primaryContainer.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-              child: Lottie.asset('assets/animations/logo.json'),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'How can I assist you today?',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try asking me anything or use one of the suggestions below!',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return AppBar(
-      leading: Builder(
-        builder: (context) {
-          return RoundedIconButton(
-            onTap: () => Scaffold.of(context).openDrawer(),
-            child: SvgPicture.asset(
-              'assets/icons/menu_ic.svg',
-              colorFilter: ColorFilter.mode(
-                colorScheme.onSurface,
-                BlendMode.srcIn,
-              ),
-            ),
-          );
-        },
-      ),
-      title: Anchor(
-        placement: Placement.bottom,
-
-        overlayBuilder: (context) =>
-            _buildModelMenu(context, chatCubit.state.models),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Nova AI', style: TextStyle(fontWeight: FontWeight.w600)),
-            SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-          ],
-        ),
-      ),
-      actions: [
-        BlocBuilder<ThemeCubit, ThemeState>(
-          builder: (context, state) {
-            final isDark = state.themeMode == ThemeMode.dark;
-            return RoundedIconButton(
-              onTap: context.read<ThemeCubit>().toggle,
-              child: Icon(
-                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                color: colorScheme.onSurface,
-                size: 22,
-              ),
-            );
-          },
-        ),
-        RoundedIconButton(
-          onTap: chatCubit.startNewChat,
-          child: SvgPicture.asset(
-            'assets/icons/new_chat_ic.svg',
-            colorFilter: ColorFilter.mode(
-              colorScheme.onSurface,
-              BlendMode.srcIn,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
-  }
-
-  Widget _buildModelMenu(BuildContext context, List<OpenRouterModel> models) {
-    final colors = Theme.of(context).colorScheme;
-    final chatCubit = context.read<ChatCubit>();
-    return BlocBuilder<ChatCubit, ChatState>(
-      builder: (context, state) {
-        return Material(
-          color: Colors.transparent,
-          child: Container(
-            width: 280,
-            constraints: const BoxConstraints(maxHeight: 420),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: colors.outlineVariant.withOpacity(.5)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    shrinkWrap: true,
-                    itemCount: models.length,
-                    itemBuilder: (context, index) {
-                      final model = models[index];
-                      final isSelected = model.id == state.selectedModel;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: ModelTile(
-                          title: model.name,
-                          subtitle: model.description,
-                          selected: isSelected,
-                          idModel: model.id,
-                          onTap: () {
-                            chatCubit.setSelectedModel(model.id);
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSuggestions(
-    List<Suggestion> suggestions,
-
-    void Function(Suggestion) onSuggestionTap,
-  ) {
-    return SizedBox(
-      height: 104,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        scrollDirection: Axis.horizontal,
-        itemBuilder: (context, index) {
-          return GestureDetector(
-            onTap: () => onSuggestionTap(suggestions[index]),
-            child: SuggestionCard(suggestion: suggestions[index]),
-          );
-        },
-        itemCount: suggestions.length,
-      ),
-    );
-  }
-
-  Widget _buildMessageList(
-    BuildContext context,
-    List<Message> messages,
-    bool isLoading,
-    bool isStreaming,
-    ScrollController _scrollController,
-  ) {
-    final itemCount = messages.length + (isLoading ? 1 : 0);
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      itemCount: itemCount,
-      controller: _scrollController,
-      itemBuilder: (context, index) {
-        if (index == messages.length) {
-          return const AiTypingBuble();
-        }
-        final message = messages[index];
-        final isUserMessage = message.role == MessageType.user;
-        final isStreamingMessage =
-            isStreaming && index == messages.length - 1 && !isUserMessage;
-
-        return Align(
-          alignment: isUserMessage
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
-          child: isUserMessage
-              ? UserMessageBubble(message: message)
-              : AiMessageBubble(
-                  text: message.content,
-                  showActions: !isStreamingMessage,
-                ),
-        );
-      },
     );
   }
 }
