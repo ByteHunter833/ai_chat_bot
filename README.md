@@ -55,9 +55,14 @@ AI Chat Bot is a sophisticated conversational interface built with Flutter, powe
 
 ## Screenshots
 
-|                 Chat Interface                 |                Conversation History                |
-| :--------------------------------------------: | :------------------------------------------------: |
-| ![Chat Screen](/assets/images/chat_screen.png) | ![Historsy Screen](assets/images/chat_history.png) |
+|                         Welcome Screen                         |
+| :------------------------------------------------------------: |
+| ![Welcome Screen](/assets/images/ios_version_welcome_page.png) |
+
+|                   Chat Interface                   |                  Conversation History                  |
+| :------------------------------------------------: | :----------------------------------------------------: |
+|   ![Chat Screen](/assets/images/chat_screen.png)   |   ![Historsy Screen](assets/images/chat_history.png)   |
+| ![Chat Screen](/assets/images/chat_screen_ios.png) | ![Historsy Screen](assets/images/chat_history_ios.png) |
 
 ## Usage
 
