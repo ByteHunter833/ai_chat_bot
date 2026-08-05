@@ -30,11 +30,6 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
-      - name: Install CocoaPods
-        run: |
-          cd ios
-          pod install
-
       - name: Build iOS Simulator
         run: |
           flutter build ios \
