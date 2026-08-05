@@ -40,7 +40,7 @@ jobs:
           flutter build ios \
             --simulator \
             --debug \
-            --dart-define=OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+            --dart-define=OPENROUTER_API_KEY=${{ secrets.OPEN_ROUTER_API_KEY }}
 
       - name: Upload iOS Simulator App
         uses: actions/upload-artifact@v4
