@@ -1,7 +1,9 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:nova_ai/features/chat/data/models/chat.dart';
 import 'package:nova_ai/features/chat/data/models/message.dart';
+import 'package:nova_ai/features/chat/data/models/open_router_model.dart';
 import 'package:nova_ai/features/chat/data/models/suggestions.dart';
 import 'package:nova_ai/features/chat/domain/repositories/chat_repository.dart';
 import 'package:nova_ai/features/chat/domain/repositories/sql_chat_repository.dart';
@@ -11,9 +13,34 @@ part 'chat_state.dart';
 class ChatCubit extends Cubit<ChatState> {
   final ChatRepository chatRepository;
   final SQLiteChatRepository sqlChatRepository = SQLiteChatRepository();
+
+  static final List<OpenRouterModel> _models = [
+    const OpenRouterModel(
+      id: 'google/gemma-4-26b-a4b-it:free',
+      name: 'Gemma 4.26B',
+      description: 'Reasoning and code generation',
+      supportsVision: true,
+      supportsReasoning: true,
+    ),
+
+    const OpenRouterModel(
+      id: 'inclusionai/ling-3.0-flash:free',
+      name: 'Ling 3.0 Flash',
+      description: 'Role Play',
+      goodForRoleplay: true,
+    ),
+    const OpenRouterModel(
+      id: 'cohere/north-mini-code:free',
+      name: 'North Mini Code',
+      description: 'Code generation',
+    ),
+  ];
+
   ChatCubit(this.chatRepository)
     : super(
         ChatState(
+          models: _models,
+          selectedModel: _models.first.id,
           messages: [],
           chats: [],
           suggestions: [
@@ -25,7 +52,6 @@ class ChatCubit extends Cubit<ChatState> {
               text: 'Explain airplane',
               description: 'to someone 5 years old',
             ),
-
             const Suggestion(
               text: 'What is the capital of France?',
               description: 'Learn about the capital city of France.',
@@ -69,11 +95,13 @@ class ChatCubit extends Cubit<ChatState> {
     );
     await _persistChats(chatsWithUserMessage);
 
-    // Stream the assistant's response
     final buffer = StringBuffer();
     final assistantMessageId = _messageId();
     try {
-      await for (final chunk in chatRepository.streamMessage(userMessages)) {
+      await for (final chunk in chatRepository.streamMessage(
+        userMessages,
+        model: state.selectedModel,
+      )) {
         buffer.write(chunk);
         final streamedMessages = [
           ...userMessages,
@@ -251,5 +279,10 @@ class ChatCubit extends Cubit<ChatState> {
     return normalized.length > 42
         ? '${normalized.substring(0, 42)}...'
         : normalized;
+  }
+
+  void setSelectedModel(String id) {
+    emit(state.copyWith(selectedModel: id));
+    debugPrint('Selected model updated to: $id');
   }
 }

@@ -8,15 +8,19 @@ class ChatState extends Equatable {
   final String? errorMessage;
   final List<Chat> chats;
   final String? currentChatId;
+  final String selectedModel;
+  final List<OpenRouterModel> models;
 
-  ChatState({
+  const ChatState({
     required this.messages,
     required this.suggestions,
     this.isLoading = false,
+    required this.selectedModel,
     this.isStreaming = false,
     this.errorMessage,
     required this.chats,
     this.currentChatId,
+    this.models = const [],
   });
 
   ChatState copyWith({
@@ -27,6 +31,8 @@ class ChatState extends Equatable {
     String? errorMessage,
     List<Chat>? chats,
     String? currentChatId,
+    String? selectedModel,
+    List<OpenRouterModel>? models,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -36,17 +42,21 @@ class ChatState extends Equatable {
       errorMessage: errorMessage,
       chats: chats ?? this.chats,
       currentChatId: currentChatId ?? this.currentChatId,
+      selectedModel: selectedModel ?? this.selectedModel,
+      models: models ?? this.models,
     );
   }
 
   @override
   List<Object?> get props => [
-    messages,
-    suggestions,
-    isLoading,
-    isStreaming,
-    errorMessage,
-    chats,
-    currentChatId,
-  ];
+        messages,
+        suggestions,
+        isLoading,
+        isStreaming,
+        errorMessage,
+        chats,
+        currentChatId,
+        selectedModel,
+        models,
+      ];
 }

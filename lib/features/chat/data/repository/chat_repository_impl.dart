@@ -7,7 +7,7 @@ class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl(this.chatRemoteDataSource);
 
   @override
-  Stream<String> streamMessage(List<Message> messages) {
-    return chatRemoteDataSource.streamMessage(messages);
+  Stream<String> streamMessage(List<Message> messages, {String? model}) {
+    return chatRemoteDataSource.streamMessage(messages, model: model);
   }
 }

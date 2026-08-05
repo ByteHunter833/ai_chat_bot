@@ -15,50 +15,17 @@ import 'package:nova_ai/core/shared_widgets/chat/input_field.dart';
 import 'package:nova_ai/core/shared_widgets/chat/suggestion_card.dart';
 import 'package:nova_ai/core/shared_widgets/chat/user_message_buble.dart';
 import 'package:nova_ai/core/theme/theme_cubit.dart';
+import 'package:nova_ai/core/theme/theme_state.dart';
 import 'package:nova_ai/features/chat/data/models/message.dart';
+import 'package:nova_ai/features/chat/data/models/open_router_model.dart';
 import 'package:nova_ai/features/chat/data/models/suggestions.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
+import 'package:nova_ai/features/chat/presentation/widgets/model_item.dart';
+import 'package:nova_ai/features/chat/presentation/widgets/rounded_icon.dart';
 import 'package:nova_ai/service/file_picker_service.dart';
+import 'package:nova_ai/utils/utils.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-
-String _guessMimeType(String path) {
-  final ext = path.split('.').last.toLowerCase();
-  switch (ext) {
-    case 'png':
-      return 'image/png';
-    case 'webp':
-      return 'image/webp';
-    case 'gif':
-      return 'image/gif';
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg';
-    default:
-      return 'application/octet-stream';
-  }
-}
-
-String _mimeTypeForFile(XFile file) {
-  final mimeType = file.mimeType;
-  if (mimeType != null && mimeType.isNotEmpty) return mimeType;
-  return _guessMimeType(file.path);
-}
-
-String _extensionForMimeType(String mimeType) {
-  switch (mimeType) {
-    case 'image/png':
-      return '.png';
-    case 'image/webp':
-      return '.webp';
-    case 'image/gif':
-      return '.gif';
-    case 'image/jpeg':
-      return '.jpg';
-    default:
-      return '.bin';
-  }
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -75,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _shouldAutoScroll = true;
 
   void handleSuggestionTap(Suggestion suggestion) {
-    messageController.text = suggestion.text + ' ' + suggestion.description;
+    messageController.text = '${suggestion.text} ${suggestion.description}';
   }
 
   bool get hasText => messageController.text.isNotEmpty;
@@ -108,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.pop(sheetContext);
     final file = await pick();
     if (file == null) return;
-    if (!_mimeTypeForFile(file).startsWith('image/')) {
+    if (!mimeTypeForFile(file).startsWith('image/')) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Only images are supported right now')),
@@ -179,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      imageMimeType = _mimeTypeForFile(image);
+      imageMimeType = mimeTypeForFile(image);
       imageBase64 = base64Encode(imageBytes);
       imageFilePath = await _saveAttachmentCopy(
         image,
@@ -213,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final originalExtension = path.extension(file.path);
       final extension = originalExtension.isNotEmpty
           ? originalExtension
-          : _extensionForMimeType(mimeType);
+          : extensionForMimeType(mimeType);
       final fileName = '${DateTime.now().microsecondsSinceEpoch}$extension'
           .toLowerCase();
       final savedFile = File(path.join(attachmentsDirectory.path, fileName));
@@ -376,294 +343,218 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
 
-Widget _buildEmptyState(BuildContext context) {
-  final colorScheme = Theme.of(context).colorScheme;
-  return Center(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  colorScheme.primaryContainer,
-                  colorScheme.primaryContainer.withValues(alpha: 0),
-                ],
-              ),
-            ),
-            child: Lottie.asset('assets/animations/logo.json'),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'How can I assist you today?',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try asking me anything or use one of the suggestions below!',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-        ],
-      ),
-    ),
-  );
-}
-
-PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
-  final colorScheme = Theme.of(context).colorScheme;
-  return AppBar(
-    leading: Builder(
-      builder: (context) {
-        return _RoundedIconButton(
-          onTap: () => Scaffold.of(context).openDrawer(),
-          child: SvgPicture.asset(
-            'assets/icons/menu_ic.svg',
-            colorFilter: ColorFilter.mode(
-              colorScheme.onSurface,
-              BlendMode.srcIn,
-            ),
-          ),
-        );
-      },
-    ),
-    title: Anchor(
-      placement: Placement.bottom,
-      overlayBuilder: (context) => _buildModelMenu(context),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Nova AI', style: TextStyle(fontWeight: FontWeight.w600)),
-          SizedBox(width: 4),
-          Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-        ],
-      ),
-    ),
-    actions: [
-      BlocBuilder<ThemeCubit, ThemeMode>(
-        builder: (context, themeMode) {
-          final isDark =
-              themeMode == ThemeMode.dark ||
-              (themeMode == ThemeMode.system &&
-                  MediaQuery.platformBrightnessOf(context) == Brightness.dark);
-          return _RoundedIconButton(
-            onTap: context.read<ThemeCubit>().toggle,
-            child: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              color: colorScheme.onSurface,
-              size: 22,
-            ),
-          );
-        },
-      ),
-      _RoundedIconButton(
-        onTap: chatCubit.startNewChat,
-        child: SvgPicture.asset(
-          'assets/icons/new_chat_ic.svg',
-          colorFilter: ColorFilter.mode(colorScheme.onSurface, BlendMode.srcIn),
-        ),
-      ),
-      const SizedBox(width: 8),
-    ],
-  );
-}
-
-Widget _buildModelMenu(BuildContext context) {
-  final colors = Theme.of(context).colorScheme;
-
-  return Material(
-    elevation: 8,
-    borderRadius: BorderRadius.circular(18),
-    color: colors.surfaceContainer,
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 300, maxHeight: 260),
-      child: ListView(
-        padding: const EdgeInsets.all(8),
-        shrinkWrap: true,
-        children: const [
-          _ModelTile(
-            title: 'Nova AI',
-            subtitle: 'Default model',
-            selected: true,
-          ),
-          SizedBox(height: 4),
-          _ModelTile(
-            title: 'Gemini 2.5 Flash',
-            subtitle: 'Fast and lightweight',
-          ),
-          SizedBox(height: 4),
-          _ModelTile(title: 'Gemini 2.5 Pro', subtitle: 'Best reasoning'),
-        ],
-      ),
-    ),
-  );
-}
-
-class _ModelTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool selected;
-
-  const _ModelTile({
-    required this.title,
-    required this.subtitle,
-    this.selected = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () {},
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: selected ? colors.primaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: colors.onSurfaceVariant,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
+            Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colorScheme.primaryContainer,
+                    colorScheme.primaryContainer.withValues(alpha: 0),
+                  ],
+                ),
               ),
+              child: Lottie.asset('assets/animations/logo.json'),
             ),
-            if (selected) Icon(Icons.check_rounded, color: colors.primary),
+            const SizedBox(height: 24),
+            Text(
+              'How can I assist you today?',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try asking me anything or use one of the suggestions below!',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
-}
 
-class _RoundedIconButton extends StatelessWidget {
-  final VoidCallback? onTap;
-  final Widget child;
-
-  const _RoundedIconButton({this.onTap, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, ChatCubit chatCubit) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Material(
-        color: colorScheme.surfaceContainerHigh,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Padding(padding: const EdgeInsets.all(10), child: child),
+    return AppBar(
+      leading: Builder(
+        builder: (context) {
+          return RoundedIconButton(
+            onTap: () => Scaffold.of(context).openDrawer(),
+            child: SvgPicture.asset(
+              'assets/icons/menu_ic.svg',
+              colorFilter: ColorFilter.mode(
+                colorScheme.onSurface,
+                BlendMode.srcIn,
+              ),
+            ),
+          );
+        },
+      ),
+      title: Anchor(
+        placement: Placement.bottom,
+
+        overlayBuilder: (context) =>
+            _buildModelMenu(context, chatCubit.state.models),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Nova AI', style: TextStyle(fontWeight: FontWeight.w600)),
+            SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+          ],
         ),
+      ),
+      actions: [
+        BlocBuilder<ThemeCubit, ThemeState>(
+          builder: (context, state) {
+            final isDark = state.themeMode == ThemeMode.dark;
+            return RoundedIconButton(
+              onTap: context.read<ThemeCubit>().toggle,
+              child: Icon(
+                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                color: colorScheme.onSurface,
+                size: 22,
+              ),
+            );
+          },
+        ),
+        RoundedIconButton(
+          onTap: chatCubit.startNewChat,
+          child: SvgPicture.asset(
+            'assets/icons/new_chat_ic.svg',
+            colorFilter: ColorFilter.mode(
+              colorScheme.onSurface,
+              BlendMode.srcIn,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  Widget _buildModelMenu(BuildContext context, List<OpenRouterModel> models) {
+    final colors = Theme.of(context).colorScheme;
+    final chatCubit = context.read<ChatCubit>();
+    return BlocBuilder<ChatCubit, ChatState>(
+      builder: (context, state) {
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            width: 280,
+            constraints: const BoxConstraints(maxHeight: 420),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: colors.outlineVariant.withOpacity(.5)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    shrinkWrap: true,
+                    itemCount: models.length,
+                    itemBuilder: (context, index) {
+                      final model = models[index];
+                      final isSelected = model.id == state.selectedModel;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: ModelTile(
+                          title: model.name,
+                          subtitle: model.description,
+                          selected: isSelected,
+                          idModel: model.id,
+                          onTap: () {
+                            chatCubit.setSelectedModel(model.id);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSuggestions(
+    List<Suggestion> suggestions,
+
+    void Function(Suggestion) onSuggestionTap,
+  ) {
+    return SizedBox(
+      height: 104,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        scrollDirection: Axis.horizontal,
+        itemBuilder: (context, index) {
+          return GestureDetector(
+            onTap: () => onSuggestionTap(suggestions[index]),
+            child: SuggestionCard(suggestion: suggestions[index]),
+          );
+        },
+        itemCount: suggestions.length,
       ),
     );
   }
-}
 
-Widget _buildSuggestions(
-  List<Suggestion> suggestions,
-
-  void Function(Suggestion) onSuggestionTap,
-) {
-  return SizedBox(
-    height: 104,
-    child: ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      scrollDirection: Axis.horizontal,
+  Widget _buildMessageList(
+    BuildContext context,
+    List<Message> messages,
+    bool isLoading,
+    bool isStreaming,
+    ScrollController _scrollController,
+  ) {
+    final itemCount = messages.length + (isLoading ? 1 : 0);
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      itemCount: itemCount,
+      controller: _scrollController,
       itemBuilder: (context, index) {
-        return GestureDetector(
-          onTap: () => onSuggestionTap(suggestions[index]),
-          child: SuggestionCard(suggestion: suggestions[index]),
+        if (index == messages.length) {
+          return const AiTypingBuble();
+        }
+        final message = messages[index];
+        final isUserMessage = message.role == MessageType.user;
+        final isStreamingMessage =
+            isStreaming && index == messages.length - 1 && !isUserMessage;
+
+        return Align(
+          alignment: isUserMessage
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+          child: isUserMessage
+              ? UserMessageBubble(message: message)
+              : AiMessageBubble(
+                  text: message.content,
+                  showActions: !isStreamingMessage,
+                ),
         );
       },
-      itemCount: suggestions.length,
-    ),
-  );
-}
-
-Widget _buildMessageList(
-  BuildContext context,
-  List<Message> messages,
-  bool isLoading,
-  bool isStreaming,
-  ScrollController _scrollController,
-) {
-  final itemCount = messages.length + (isLoading ? 1 : 0);
-  return ListView.builder(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-    itemCount: itemCount,
-    controller: _scrollController,
-    itemBuilder: (context, index) {
-      if (index == messages.length) {
-        return const AiTypingBuble();
-      }
-      final message = messages[index];
-      final isUserMessage = message.role == MessageType.user;
-      final isStreamingMessage =
-          isStreaming && index == messages.length - 1 && !isUserMessage;
-
-      return Align(
-        alignment: isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
-        child: isUserMessage
-            ? UserMessageBubble(message: message)
-            : AiMessageBubble(
-                text: message.content,
-                showActions: !isStreamingMessage,
-              ),
-      );
-    },
-  );
-}
-
-class ModalItem extends StatelessWidget {
-  final String text;
-  final IconData icon;
-  final VoidCallback? onTap;
-  const ModalItem({
-    super.key,
-    required this.icon,
-    required this.text,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Row(
-        children: [
-          _RoundedIconButton(child: Icon(icon)),
-          Text(text),
-        ],
-      ),
     );
   }
 }

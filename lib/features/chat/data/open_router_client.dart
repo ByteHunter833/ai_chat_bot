@@ -1,53 +1,31 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:nova_ai/features/chat/data/models/open_router_model.dart';
 
 class OpenRouterClient {
-  static const String defaultModelId = 'google/gemma-4-26b-a4b-it:free';
-  static const List<OpenRouterModel> models = [
-    OpenRouterModel(
-      id: 'google/gemma-4-26b-a4b-it:free',
-      name: 'google/gemma-4-26b-a4b-it:free',
-      description: 'Reasoning-heavy model for complex analytical tasks.',
-      supportsVision: true,
-      supportsReasoning: true,
-    ),
-    OpenRouterModel(
-      id: 'nvidia/nemotron-nano-12b-v2-vl:free',
-      name: 'Nemotron Nano VL',
-      description: 'Universal daily model with image support (multimodal).',
-      supportsVision: true,
-    ),
-    OpenRouterModel(
-      id: 'z-ai/glm-4.5-air:free',
-      name: 'GLM 4.5 Air',
-      description: 'Great for creative dialog and role-playing scenarios.',
-      goodForRoleplay: true,
-    ),
-  ];
-
   final String apiKey;
-  final String model;
+  final String? model;
   final bool enableReasoning;
   final http.Client _httpClient;
 
   OpenRouterClient(
     this.enableReasoning,
     this.apiKey, {
-    this.model = defaultModelId,
+    this.model,
     http.Client? httpClient,
   }) : _httpClient = httpClient ?? http.Client();
 
   Stream<String> streamChatCompletion(
-    List<Map<String, dynamic>> messages, {
+    List<Map<String, dynamic>> messages,
+    String? model, {
     void Function(String)? onReasoningChunk,
   }) async* {
     final request = http.Request(
       'POST',
       Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
     );
-
+    debugPrint(model);
     request.headers.addAll({
       'Authorization': 'Bearer $apiKey',
       'Content-Type': 'application/json',
