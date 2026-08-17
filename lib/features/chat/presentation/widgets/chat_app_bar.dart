@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_anchor/flutter_anchor.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:nova_ai/core/theme/cubit/theme_cubit.dart';
-import 'package:nova_ai/core/theme/cubit/theme_state.dart';
+import 'package:nova_ai/core/theme/presentation/cubit/theme_cubit.dart';
 import 'package:nova_ai/features/chat/data/models/open_router_model.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:nova_ai/features/chat/presentation/widgets/model_item.dart';
@@ -50,11 +49,12 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
       ),
       actions: [
-        BlocBuilder<ThemeCubit, ThemeState>(
-          builder: (context, state) {
-            final isDark = state.themeMode == ThemeMode.dark;
+        Builder(
+          builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
             return RoundedIconButton(
-              onTap: context.read<ThemeCubit>().toggle,
+              onTap: () =>
+                  context.read<ThemeCubit>().toggle(Theme.of(context).brightness),
               child: Icon(
                 isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
                 color: colorScheme.onSurface,

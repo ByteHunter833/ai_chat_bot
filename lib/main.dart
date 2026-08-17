@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nova_ai/core/theme/app_theme.dart';
-import 'package:nova_ai/core/theme/cubit/theme_cubit.dart';
-import 'package:nova_ai/core/theme/cubit/theme_state.dart';
+import 'package:nova_ai/core/theme/data/theme_local_data_source.dart';
+import 'package:nova_ai/core/theme/data/theme_repository_impl.dart';
+import 'package:nova_ai/core/theme/presentation/cubit/theme_cubit.dart';
+import 'package:nova_ai/core/theme/presentation/cubit/theme_state.dart';
 import 'package:nova_ai/features/chat/data/repository/chat_remote_data_source_impl.dart';
 import 'package:nova_ai/features/chat/data/repository/chat_repository_impl.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
@@ -40,7 +42,11 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        BlocProvider(create: (context) => ThemeCubit()),
+        BlocProvider(
+          create: (context) => ThemeCubit(
+            ThemeRepositoryImpl(ThemeLocalDataSource()),
+          ),
+        ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {

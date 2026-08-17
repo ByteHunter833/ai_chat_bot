@@ -50,6 +50,7 @@ dependencies:
   flutter_anchor: ^0.0.13
 
   quick_action_menu: ^1.0.1
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

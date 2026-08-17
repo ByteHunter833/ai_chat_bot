@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
-import 'package:nova_ai/core/theme/cubit/theme_cubit.dart';
-import 'package:nova_ai/core/theme/cubit/theme_state.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AiMessageBubble extends StatelessWidget {
@@ -26,37 +23,34 @@ class AiMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: BlocBuilder<ThemeCubit, ThemeState>(
-        builder: (context, state) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SmoothMarkdown(
-              selectable: true,
-              data: text,
-              styleSheet: MarkdownStyleSheet.vscode(
-                brightness: state.themeMode == ThemeMode.dark
-                    ? Brightness.dark
-                    : Brightness.light,
-              ),
-              builderRegistry: BuilderRegistry()
-                ..register(
-                  'code_block',
-                  const EnhancedCodeBlockBuilder(
-                    showCopyButton: true,
-                    showLanguageTag: true,
-                    enableSyntaxHighlighting: true,
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SmoothMarkdown(
+            selectable: true,
+            data: text,
+            styleSheet: MarkdownStyleSheet.vscode(
+              brightness: Theme.of(context).brightness,
+            ),
+            builderRegistry: BuilderRegistry()
+              ..register(
+                'code_block',
+                const EnhancedCodeBlockBuilder(
+                  showCopyButton: true,
+                  showLanguageTag: true,
+                  enableSyntaxHighlighting: true,
                 ),
-              onTapLink: (String url) async {
-                final uri = Uri.parse(url);
+              ),
+            onTapLink: (String url) async {
+              final uri = Uri.parse(url);
 
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.inAppWebView);
-                } else {
-                  debugPrint('Не удалось открыть $url');
-                }
-              },
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.inAppWebView);
+              } else {
+                debugPrint('Не удалось открыть $url');
+              }
+            },
             ),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
@@ -116,7 +110,6 @@ class AiMessageBubble extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }
