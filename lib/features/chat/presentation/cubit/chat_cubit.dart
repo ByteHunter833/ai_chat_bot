@@ -225,6 +225,55 @@ class ChatCubit extends Cubit<ChatState> {
     await _persistChats(chats);
   }
 
+  Future<void> deleteChat(String chatId) async {
+    final chats = List<Chat>.from(state.chats)
+      ..removeWhere((chat) => chat.id == chatId);
+
+    if (chats.isEmpty) {
+      final newChat = Chat.empty();
+      emit(
+        state.copyWith(
+          messages: [],
+          chats: [newChat],
+          currentChatId: newChat.id,
+          isLoading: false,
+          isStreaming: false,
+        ),
+      );
+      await _persistChats([newChat]);
+      return;
+    }
+
+    final wasCurrent = state.currentChatId == chatId;
+    final currentChat = wasCurrent
+        ? chats.first
+        : chats.firstWhere(
+            (chat) => chat.id == state.currentChatId,
+            orElse: () => chats.first,
+          );
+    emit(
+      state.copyWith(
+        messages: currentChat.messages,
+        chats: chats,
+        currentChatId: currentChat.id,
+        isLoading: false,
+        isStreaming: false,
+      ),
+    );
+    await _persistChats(chats);
+  }
+
+  Future<void> renameChat(String chatId, String newTitle) async {
+    final title = newTitle.trim();
+    if (title.isEmpty) return;
+    final chats = List<Chat>.from(state.chats);
+    final index = chats.indexWhere((chat) => chat.id == chatId);
+    if (index == -1) return;
+    chats[index] = chats[index].copyWith(title: title);
+    emit(state.copyWith(chats: chats));
+    await _persistChats(chats);
+  }
+
   void clearChat() {
     final chat = _currentChat().copyWith(messages: []);
     final chats = _upsertChat(chat);

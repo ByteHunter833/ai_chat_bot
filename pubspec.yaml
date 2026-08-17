@@ -49,6 +49,8 @@ dependencies:
   equatable: ^2.1.0
   flutter_anchor: ^0.0.13
 
+  quick_action_menu: ^1.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
