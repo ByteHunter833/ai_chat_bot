@@ -1,14 +1,21 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nova_ai/core/theme/app_theme.dart';
+import 'package:nova_ai/firebase_options.dart';
 import 'package:nova_ai/core/theme/data/theme_local_data_source.dart';
 import 'package:nova_ai/core/theme/data/theme_repository_impl.dart';
 import 'package:nova_ai/core/theme/presentation/cubit/theme_cubit.dart';
 import 'package:nova_ai/core/theme/presentation/cubit/theme_state.dart';
+import 'package:nova_ai/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:nova_ai/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:nova_ai/features/chat/data/repository/chat_remote_data_source_impl.dart';
 import 'package:nova_ai/features/chat/data/repository/chat_repository_impl.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:nova_ai/features/chat/presentation/screens/home_screen.dart';
+import 'package:nova_ai/features/payment/data/datasources/stripe_payment_datasource.dart';
+import 'package:nova_ai/features/payment/data/repositories/payment_repository_impl.dart';
+import 'package:nova_ai/features/payment/presentation/cubit/payment_cubit.dart';
 import 'package:nova_ai/service/data_base_service.dart';
 
 const openRouterApiKey = String.fromEnvironment(
@@ -18,6 +25,7 @@ const openRouterApiKey = String.fromEnvironment(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await AppDatabase.instance.database;
   if (openRouterApiKey.isEmpty) {
     debugPrint(
@@ -43,9 +51,13 @@ class MyApp extends StatelessWidget {
           ),
         ),
         BlocProvider(
-          create: (context) => ThemeCubit(
-            ThemeRepositoryImpl(ThemeLocalDataSource()),
-          ),
+          create: (context) =>
+              ThemeCubit(ThemeRepositoryImpl(ThemeLocalDataSource())),
+        ),
+        BlocProvider(create: (context) => AuthCubit(AuthRepositoryImpl())),
+        BlocProvider(
+          create: (context) =>
+              PaymentCubit(PaymentRepositoryImpl(StripePaymentDataSource())),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(

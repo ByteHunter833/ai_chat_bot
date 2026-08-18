@@ -1,8 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nova_ai/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:nova_ai/features/auth/presentation/cubit/auth_state.dart';
+import 'package:nova_ai/features/auth/presentation/screens/login_screen.dart';
 import 'package:nova_ai/features/chat/data/models/chat.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
+import 'package:nova_ai/features/payment/presentation/screens/paywall_screen.dart';
 import 'package:quick_action_menu/quick_action_menu.dart';
 
 class ChatHistoryDrawer extends StatefulWidget {
@@ -243,10 +247,119 @@ class _ChatHistoryDrawerState extends State<ChatHistoryDrawer> {
                   ),
                 ),
               ),
+              const Divider(height: 24),
+              BlocBuilder<AuthCubit, AuthState>(
+                builder: (context, authState) {
+                  return _buildAccountSection(context, authState);
+                },
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAccountSection(BuildContext context, AuthState authState) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final user = authState.user;
+    final isAuthenticated = authState.isAuthenticated;
+    debugPrint('${authState.user}');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: colorScheme.surfaceContainerHigh,
+              child: Icon(
+                isAuthenticated ? Icons.person : Icons.person_outline,
+                size: 20,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user?.name ?? (isAuthenticated ? 'User' : 'Guest'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    user?.email ??
+                        (isAuthenticated ? '' : 'Sign in to sync your account'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isAuthenticated)
+              IconButton(
+                tooltip: 'Sign out',
+                icon: Icon(
+                  CupertinoIcons.arrow_right_to_line,
+                  size: 18,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                onPressed: () => context.read<AuthCubit>().signOut(),
+              )
+            else
+              TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                ),
+                child: const Text('Sign in'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Material(
+          color: colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(16),
+          child: ListTile(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            leading: Icon(
+              Icons.workspace_premium_outlined,
+              color: authState.isPro
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+            title: const Text('Nova AI Pro'),
+            subtitle: Text(
+              authState.isPro ? 'Active' : 'Unlock roleplay & coding models',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            trailing: authState.isPro
+                ? Icon(Icons.check_circle, color: colorScheme.primary)
+                : Icon(
+                    CupertinoIcons.chevron_right,
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PaywallScreen()),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
     );
   }
 

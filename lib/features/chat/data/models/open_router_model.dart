@@ -5,6 +5,7 @@ class OpenRouterModel {
   final bool supportsVision;
   final bool goodForRoleplay;
   final bool supportsReasoning;
+  final bool isPro;
 
   const OpenRouterModel({
     required this.id,
@@ -13,5 +14,6 @@ class OpenRouterModel {
     this.supportsVision = false,
     this.goodForRoleplay = false,
     this.supportsReasoning = false,
+    this.isPro = false,
   });
 }

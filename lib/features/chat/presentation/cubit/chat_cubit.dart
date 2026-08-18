@@ -28,11 +28,13 @@ class ChatCubit extends Cubit<ChatState> {
       name: 'Ling 3.0 Flash',
       description: 'Role Play',
       goodForRoleplay: true,
+      isPro: true,
     ),
     const OpenRouterModel(
       id: 'cohere/north-mini-code:free',
       name: 'North Mini Code',
       description: 'Code generation',
+      isPro: true,
     ),
   ];
 

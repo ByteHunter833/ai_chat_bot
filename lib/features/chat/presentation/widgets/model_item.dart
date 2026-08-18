@@ -11,6 +11,8 @@ class ModelTile extends StatelessWidget {
     this.supportsVision = false,
     this.supportsReasoning = false,
     this.goodForRoleplay = false,
+    this.isPro = false,
+    this.isProUnlocked = true,
     this.onTap,
   });
 
@@ -22,12 +24,15 @@ class ModelTile extends StatelessWidget {
   final bool supportsVision;
   final bool supportsReasoning;
   final bool goodForRoleplay;
+  final bool isPro;
+  final bool isProUnlocked;
 
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final isProLocked = isPro && !isProUnlocked;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -59,11 +64,41 @@ class ModelTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          if (isPro) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.tertiaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'PRO',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: .5,
+                                  color: colors.onTertiaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
 
                       const SizedBox(height: 2),
@@ -92,6 +127,12 @@ class ModelTile extends StatelessWidget {
                           Icons.check_circle,
                           key: const ValueKey(true),
                           color: colors.primary,
+                        )
+                      : isProLocked
+                      ? Icon(
+                          Icons.lock_outline,
+                          key: const ValueKey('lock'),
+                          color: colors.onSurfaceVariant,
                         )
                       : const SizedBox(key: ValueKey(false), width: 24),
                 ),

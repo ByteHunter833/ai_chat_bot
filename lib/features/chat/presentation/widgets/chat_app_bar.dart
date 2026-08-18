@@ -3,10 +3,13 @@ import 'package:flutter_anchor/flutter_anchor.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:nova_ai/core/theme/presentation/cubit/theme_cubit.dart';
+import 'package:nova_ai/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:nova_ai/features/auth/presentation/cubit/auth_state.dart';
 import 'package:nova_ai/features/chat/data/models/open_router_model.dart';
 import 'package:nova_ai/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:nova_ai/features/chat/presentation/widgets/model_item.dart';
 import 'package:nova_ai/features/chat/presentation/widgets/rounded_icon.dart';
+import 'package:nova_ai/features/payment/presentation/screens/paywall_screen.dart';
 
 class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final ChatCubit chatCubit;
@@ -82,51 +85,69 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
 Widget _buildModelMenu(BuildContext context, List<OpenRouterModel> models) {
   final colors = Theme.of(context).colorScheme;
   final chatCubit = context.read<ChatCubit>();
-  return BlocBuilder<ChatCubit, ChatState>(
-    builder: (context, state) {
-      return Material(
-        color: Colors.transparent,
-        child: Container(
-          width: 280,
-          constraints: const BoxConstraints(maxHeight: 420),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: colors.outlineVariant.withOpacity(.5)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  shrinkWrap: true,
-                  itemCount: models.length,
-                  itemBuilder: (context, index) {
-                    final model = models[index];
-                    final isSelected = model.id == state.selectedModel;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: ModelTile(
-                        title: model.name,
-                        subtitle: model.description,
-                        selected: isSelected,
-                        idModel: model.id,
-                        onTap: () {
-                          chatCubit.setSelectedModel(model.id);
-                        },
-                      ),
-                    );
-                  },
+  return BlocSelector<AuthCubit, AuthState, bool>(
+    selector: (authState) => authState.isPro,
+    builder: (context, isProUser) {
+      return BlocBuilder<ChatCubit, ChatState>(
+        builder: (context, state) {
+          return Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 280,
+              constraints: const BoxConstraints(maxHeight: 420),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: colors.outlineVariant.withOpacity(.5),
                 ),
               ),
-            ],
-          ),
-        ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                      shrinkWrap: true,
+                      itemCount: models.length,
+                      itemBuilder: (context, index) {
+                        final model = models[index];
+                        final isSelected = model.id == state.selectedModel;
+                        final isLocked = model.isPro && !isProUser;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: ModelTile(
+                            title: model.name,
+                            subtitle: model.description,
+                            selected: isSelected,
+                            idModel: model.id,
+                            isPro: model.isPro,
+                            isProUnlocked: isProUser,
+                            onTap: () {
+                              if (isLocked) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const PaywallScreen(),
+                                  ),
+                                );
+                                return;
+                              }
+                              chatCubit.setSelectedModel(model.id);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       );
     },
   );
