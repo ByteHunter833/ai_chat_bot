@@ -27,6 +27,16 @@ subprojects {
     }
 }
 
+// com.google.android.gms:play-services-tapandpay:18.8.0 is referenced by
+// com.stripe:stripe-android-issuing-push-provisioning but is not published on
+// Google Maven. The app does not use Issuing push provisioning, so drop it from
+// every configuration (the lint-vital release checks otherwise fail to resolve).
+subprojects {
+    configurations.all {
+        exclude(group = "com.google.android.gms", module = "play-services-tapandpay")
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

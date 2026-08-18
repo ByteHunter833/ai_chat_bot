@@ -5,14 +5,14 @@ import 'package:nova_ai/features/chat/data/models/chat.dart';
 import 'package:nova_ai/features/chat/data/models/message.dart';
 import 'package:nova_ai/features/chat/data/models/open_router_model.dart';
 import 'package:nova_ai/features/chat/data/models/suggestions.dart';
+import 'package:nova_ai/features/chat/data/repository/firestore_chat_repository.dart';
 import 'package:nova_ai/features/chat/domain/repositories/chat_repository.dart';
-import 'package:nova_ai/features/chat/domain/repositories/sql_chat_repository.dart';
 
 part 'chat_state.dart';
 
 class ChatCubit extends Cubit<ChatState> {
   final ChatRepository chatRepository;
-  final SQLiteChatRepository sqlChatRepository = SQLiteChatRepository();
+  final FirestoreChatRepository chatHistoryRepository;
 
   static final List<OpenRouterModel> _models = [
     const OpenRouterModel(
@@ -38,8 +38,10 @@ class ChatCubit extends Cubit<ChatState> {
     ),
   ];
 
-  ChatCubit(this.chatRepository)
-    : super(
+  ChatCubit(this.chatRepository, {FirestoreChatRepository? chatHistoryRepository})
+    : chatHistoryRepository =
+          chatHistoryRepository ?? FirestoreChatRepository(),
+      super(
         ChatState(
           models: _models,
           selectedModel: _models.first.id,
@@ -169,7 +171,7 @@ class ChatCubit extends Cubit<ChatState> {
 
   Future<void> loadChats() async {
     try {
-      final chats = await sqlChatRepository.loadChats();
+      final chats = await chatHistoryRepository.loadChats();
       if (chats.isNotEmpty) {
         final currentChat = chats.first;
         emit(
@@ -228,6 +230,13 @@ class ChatCubit extends Cubit<ChatState> {
   }
 
   Future<void> deleteChat(String chatId) async {
+    try {
+      await chatHistoryRepository.deleteChat(chatId);
+    } catch (e) {
+      emit(
+        state.copyWith(errorMessage: 'Failed to delete chat: ${e.toString()}'),
+      );
+    }
     final chats = List<Chat>.from(state.chats)
       ..removeWhere((chat) => chat.id == chatId);
 
@@ -316,7 +325,7 @@ class ChatCubit extends Cubit<ChatState> {
 
   Future<void> _persistChats(List<Chat> chats) async {
     try {
-      await sqlChatRepository.saveChats(chats);
+      await chatHistoryRepository.saveChats(chats);
     } catch (e) {
       emit(
         state.copyWith(errorMessage: 'Failed to save chats: ${e.toString()}'),

@@ -1,0 +1,4 @@
+-keep class com.stripe.** { *; }
+-keep class com.reactnativestripesdk.** { *; }
+-dontwarn com.stripe.android.pushProvisioning.EphemeralKeyUpdateListener
+-dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivity$f

@@ -16,7 +16,6 @@ import 'package:nova_ai/features/chat/presentation/screens/home_screen.dart';
 import 'package:nova_ai/features/payment/data/datasources/stripe_payment_datasource.dart';
 import 'package:nova_ai/features/payment/data/repositories/payment_repository_impl.dart';
 import 'package:nova_ai/features/payment/presentation/cubit/payment_cubit.dart';
-import 'package:nova_ai/service/data_base_service.dart';
 
 const openRouterApiKey = String.fromEnvironment(
   'OPENROUTER_API_KEY',
@@ -26,7 +25,6 @@ const openRouterApiKey = String.fromEnvironment(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await AppDatabase.instance.database;
   if (openRouterApiKey.isEmpty) {
     debugPrint(
       'Warning: OPENROUTER_API_KEY is not set. Run with '
